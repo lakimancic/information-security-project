@@ -1,9 +1,11 @@
 <script lang="ts">
-	import HelloWorld from '$lib/components/HelloWorld.svelte';
+	import Welcome from '$lib/pages/Welcome.svelte';
+
+	import { route } from '$lib/router.svelte';
 </script>
 
-<main
-	class="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4 select-none"
->
-	<HelloWorld />
+<main class="h-screen bg-bg-0 text-fg-0">
+	{#if route.path === '/'}
+		<Welcome />
+	{/if}
 </main>
