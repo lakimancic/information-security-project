@@ -25,7 +25,7 @@
 	];
 </script>
 
-<nav class="h-full flex flex-col items-center border border-bg-2 gap-2">
+<nav class="bg-bg-0 h-full flex flex-col items-center border border-bg-2 gap-2">
 	<LockKeyhole class="size-8 p-3 box-content text-primary opacity-50" />
 	<Tooltip.Provider>
 		{#each navItems as navItem(navItem.id)}
