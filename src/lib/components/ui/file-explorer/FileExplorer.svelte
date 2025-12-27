@@ -3,10 +3,10 @@
 	import { sizeToString, typeToIcon } from '$lib/components/ui/file-explorer/utils';
 	import { writable } from 'svelte/store';
 
-	const {
+	let {
 		"class": className,
 		files = [],
-		pwd = '',
+		pwd = $bindable(''),
 	} : {
 		"class": string;
 		files: LocalFile[];
@@ -14,11 +14,38 @@
 	} = $props();
 
 	const searchText = writable('');
+	let oldPwd = $state('');
+	let sortBy = $state<'name'|'date'|'size'|'type'>('name');
+	let sortComparator = $state((a: any, b: any) => String(a).localeCompare(String(b)));
+
+	const filesWithBack = $derived(() => [
+		{
+			filename: "..",
+			lastModified: "",
+			type: "back",
+			selected: false
+		},
+		...files
+	]);
+
+	const pwdFocusIn = () => {
+		oldPwd = pwd;
+	};
+
+	const pwdFocusOut = () => {
+		pwd = oldPwd;
+	};
 </script>
 
 <div class="flex flex-col {className} h-full min-h-0 box-border">
 	<div class="bg-bg-2 p-2 text-sm text-primary font-bold">
-		{pwd}
+		<input
+			type="text"
+			bind:value={pwd}
+			class="w-full border-none outline-none"
+			onfocusin={pwdFocusIn}
+			onfocusout={pwdFocusOut}
+		/>
 	</div>
 
 	<div class="flex flex-col flex-1 min-h-0 w-full text-left">
@@ -32,7 +59,7 @@
 			<div class="px-4 py-2">Type</div>
 		</div>
 		<div class="flex-1 min-h-0 overflow-y-auto">
-			{#each files as file}
+			{#each filesWithBack() as file}
 				<div
 					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm
 					${file.selected
@@ -60,7 +87,7 @@
 					</div>
 
 					<div class="px-4 py-2 truncate">
-						{file.type ?? "Unknown"}
+						{file.typeLong ?? ""}
 					</div>
 				</div>
 			{/each}

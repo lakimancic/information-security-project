@@ -16,19 +16,21 @@ import PptIcon from './icons/ppt_icon.png';
 import XlsIcon from './icons/excel_icon.png';
 import PdfIcon from './icons/pdf_icon.png';
 import ExeIcon from './icons/exe_icon.png';
+import BackIcon from './icons/back_icon.png';
 
 
 export function typeToIcon(type: string) {
 	switch (type) {
-		case "Image File": return ImageIcon;
-		case "Text File": return TextIcon;
-		case "File Folder": return FolderIcon;
-		case "Compressed Folder": return ZipIcon;
-		case "Document File": return DocIcon;
-		case "Presentation File": return PptIcon;
-		case "Spreadsheet File": return XlsIcon;
-		case "PDF Document": return PdfIcon;
-		case "Executable File": return ExeIcon;
+		case "image": return ImageIcon;
+		case "text": return TextIcon;
+		case "folder": return FolderIcon;
+		case "zip": return ZipIcon;
+		case "doc": return DocIcon;
+		case "ppt": return PptIcon;
+		case "xls": return XlsIcon;
+		case "pdf": return PdfIcon;
+		case "exe": return ExeIcon;
+		case "back": return BackIcon;
 	}
 	return null;
 }
