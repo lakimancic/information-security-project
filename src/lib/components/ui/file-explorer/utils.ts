@@ -4,7 +4,6 @@ interface LocalFile {
 	lastModified: string;
 	type?: string;
 	typeLong?: string;
-	selected: boolean;
 }
 
 import ImageIcon from './icons/img_icon.png';

@@ -15,15 +15,20 @@
 
 	const searchText = writable('');
 	let oldPwd = $state('');
+
 	let sortBy = $state<'name'|'date'|'size'|'type'>('name');
 	let sortComparator = $state((a: any, b: any) => String(a).localeCompare(String(b)));
+
+	let selectedIndexStart = $state(-1);
+	let selectedIndexEnd = $state(-1);
+	let rowEls = $state<{ [key: number]: HTMLDivElement | null }>({});
 
 	const filesWithBack = $derived(() => [
 		{
 			filename: "..",
 			lastModified: "",
 			type: "back",
-			selected: false
+			size: 0
 		},
 		...files
 	]);
@@ -35,6 +40,46 @@
 	const pwdFocusOut = () => {
 		pwd = oldPwd;
 	};
+
+	const handleKeyDown = (e: KeyboardEvent) => {
+		e.preventDefault();
+		if (e.key === 'ArrowUp') {
+			if (e.shiftKey) {
+				selectedIndexEnd = Math.max(0, selectedIndexEnd-1);
+			}
+			else {
+				selectedIndexStart = selectedIndexEnd = Math.max(0, selectedIndexEnd-1);
+			}
+		} else if (e.key === 'ArrowDown') {
+			if (e.shiftKey) {
+				selectedIndexEnd = Math.min(filesWithBack().length - 1, selectedIndexEnd+1);
+			}
+			else {
+				selectedIndexStart = selectedIndexEnd = Math.min(filesWithBack().length - 1, selectedIndexEnd+1);
+			}
+		}
+	};
+
+	const handleItemClick = (fileIndex: number, e: MouseEvent) => {
+		if (e.shiftKey) {
+			selectedIndexEnd = fileIndex;
+		} else {
+			selectedIndexStart = selectedIndexEnd = fileIndex;
+		}
+	};
+
+	$effect(() => {
+		const i = selectedIndexEnd;
+		if (i < 0) return;
+
+		const row = rowEls[i];
+		if (!row) return;
+
+		row.scrollIntoView({
+			block: 'nearest',
+			behavior: 'auto'
+		});
+	});
 </script>
 
 <div class="flex flex-col {className} h-full min-h-0 box-border">
@@ -48,7 +93,12 @@
 		/>
 	</div>
 
-	<div class="flex flex-col flex-1 min-h-0 w-full text-left">
+	<div 
+		class="flex flex-col flex-1 min-h-0 w-full text-left outline-none"
+		role="menu"
+		onkeydown={handleKeyDown}
+		tabindex="0"
+	>
 		<div
 			class="grid grid-cols-[2rem_2fr_2fr_1fr_2fr] bg-bg-1 text-sm font-medium shrink-0"
 		>
@@ -59,12 +109,17 @@
 			<div class="px-4 py-2">Type</div>
 		</div>
 		<div class="flex-1 min-h-0 overflow-y-auto">
-			{#each filesWithBack() as file}
+			{#each filesWithBack() as file, fileIndex}
 				<div
-					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm
-					${file.selected
-						? "bg-primary/20 border border-primary"
+					bind:this={rowEls[fileIndex]}
+					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm box-border
+					${fileIndex >= Math.min(selectedIndexStart, selectedIndexEnd) && fileIndex <= Math.max(selectedIndexStart, selectedIndexEnd)
+						? "bg-primary/20 shadow-[inset_0_0_0_1px] shadow-primary"
 						: "hover:bg-bg-2/50"}`}
+					role="button"
+					onclick={(e) => handleItemClick(fileIndex, e)}
+					onkeydown={() => {}}
+					tabindex="-1"
 				>
 					<div class="py-2 pl-2">
 						<img
