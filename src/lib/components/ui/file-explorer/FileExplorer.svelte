@@ -2,6 +2,7 @@
 	import type { LocalFile } from '$lib/components/ui/file-explorer/utils';
 	import { sizeToString, typeToIcon } from '$lib/components/ui/file-explorer/utils';
 	import { writable } from 'svelte/store';
+	import { ArrowDown, ArrowUp } from '@lucide/svelte';
 
 	let {
 		"class": className,
@@ -16,22 +17,43 @@
 	const searchText = writable('');
 	let oldPwd = $state('');
 
-	let sortBy = $state<'name'|'date'|'size'|'type'>('name');
-	let sortComparator = $state((a: any, b: any) => String(a).localeCompare(String(b)));
+	let searchBar : HTMLInputElement;
+	let pwdBar : HTMLInputElement;
+	let itemsMenu : HTMLDivElement;
+
+	type SortColumn = 'name'|'date'|'size'|'type';
+	let sortBy = writable<SortColumn>('name');
+	let sortDirection = writable<'asc'|'desc'>('asc');
+
+	const ArrowIcon = $derived($sortDirection === 'asc' ? ArrowUp : ArrowDown);
+
+	const tableColumns = [
+		{ title: "Filename", sortKey: "name" },
+		{ title: "Last Modified", sortKey: "date" },
+		{ title: "Size", sortKey: "size" },
+		{ title: "Type", sortKey: "type" },
+	];
 
 	let selectedIndexStart = $state(-1);
 	let selectedIndexEnd = $state(-1);
 	let rowEls = $state<{ [key: number]: HTMLDivElement | null }>({});
 
-	const filesWithBack = $derived(() => [
-		{
-			filename: "..",
-			lastModified: "",
-			type: "back",
-			size: 0
-		},
-		...files
-	]);
+	const filesWithBack = $derived.by(() => {
+		const filesCopy = files.toSorted((a, b) => {
+			let res = 0;
+			if ($sortBy === 'size') res = (a.size ?? 0) - (b.size ?? 0);
+			else if ($sortBy === 'date') res = (new Date(a.lastModified).getTime() - new Date(b.lastModified).getTime());
+			else if ($sortBy === 'name') res = a.filename.localeCompare(b.filename);
+			else res = a.typeLong?.localeCompare(b.typeLong ?? '') ?? 0;
+
+			return res * ($sortDirection === 'asc' ? 1 : -1);
+		});
+
+		return [
+			{ filename: "..", lastModified: "", type: "back", size: 0 },
+			...filesCopy
+		];
+	});
 
 	const pwdFocusIn = () => {
 		oldPwd = pwd;
@@ -39,6 +61,14 @@
 
 	const pwdFocusOut = () => {
 		pwd = oldPwd;
+	};
+
+	const handleColumnClick = (colName: SortColumn) => {
+		if (colName === $sortBy) {
+			sortDirection.update(old => old === 'asc' ? 'desc' : 'asc');
+		} else {
+			sortBy.update(() => colName);
+		}
 	};
 
 	const handleKeyDown = (e: KeyboardEvent) => {
@@ -52,11 +82,15 @@
 			}
 		} else if (e.key === 'ArrowDown') {
 			if (e.shiftKey) {
-				selectedIndexEnd = Math.min(filesWithBack().length - 1, selectedIndexEnd+1);
+				selectedIndexEnd = Math.min(filesWithBack.length - 1, selectedIndexEnd+1);
 			}
 			else {
-				selectedIndexStart = selectedIndexEnd = Math.min(filesWithBack().length - 1, selectedIndexEnd+1);
+				selectedIndexStart = selectedIndexEnd = Math.min(filesWithBack.length - 1, selectedIndexEnd+1);
 			}
+		} else if (e.key === '/') {
+			searchBar.focus();
+		} else if (e.key == '?') {
+			pwdBar.focus();
 		}
 	};
 
@@ -65,6 +99,14 @@
 			selectedIndexEnd = fileIndex;
 		} else {
 			selectedIndexStart = selectedIndexEnd = fileIndex;
+		}
+	};
+
+	const searchKeyDown = (e: KeyboardEvent) => {
+		console.log(e.key)
+		if (e.key == 'Escape') {
+			e.preventDefault();
+			itemsMenu.focus();
 		}
 	};
 
@@ -90,6 +132,8 @@
 			class="w-full border-none outline-none"
 			onfocusin={pwdFocusIn}
 			onfocusout={pwdFocusOut}
+			bind:this={pwdBar}
+			onkeydown={searchKeyDown}
 		/>
 	</div>
 
@@ -98,18 +142,24 @@
 		role="menu"
 		onkeydown={handleKeyDown}
 		tabindex="0"
+		bind:this={itemsMenu}
 	>
 		<div
 			class="grid grid-cols-[2rem_2fr_2fr_1fr_2fr] bg-bg-1 text-sm font-medium shrink-0"
 		>
 			<div></div>
-			<div class="px-2 py-2 truncate">Filename</div>
-			<div class="px-4 py-2 truncate">Last Modified</div>
-			<div class="px-4 py-2">Size</div>
-			<div class="px-4 py-2">Type</div>
+			{#each tableColumns as column}
+				<button 
+					class="px-2 py-2 truncate text-left flex items-center group cursor-pointer"
+					onclick={() => handleColumnClick(column.sortKey as SortColumn)}
+				>
+					{column.title}
+					<ArrowIcon class="h-4 transition-all duration-300 {$sortBy === column.sortKey ? 'text-fg-0' : 'text-fg-3/0 group-hover:text-fg-3'}" />
+				</button>
+			{/each}
 		</div>
 		<div class="flex-1 min-h-0 overflow-y-auto">
-			{#each filesWithBack() as file, fileIndex}
+			{#each filesWithBack as file, fileIndex}
 				<div
 					bind:this={rowEls[fileIndex]}
 					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm box-border
@@ -154,6 +204,8 @@
 			placeholder="Search..."
 			bind:value={$searchText}
 			class="w-full p-2 border border-bg-4 rounded outline-none"
+			bind:this={searchBar}
+			onkeydown={searchKeyDown}
 		/>
 	</div>
 </div>
