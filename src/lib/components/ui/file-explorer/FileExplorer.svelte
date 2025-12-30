@@ -15,6 +15,7 @@
 	} = $props();
 
 	const searchText = writable('');
+	let searchFilter = $state(new RegExp(""));
 	let oldPwd = $state('');
 
 	let searchBar : HTMLInputElement;
@@ -47,6 +48,8 @@
 			else res = a.typeLong?.localeCompare(b.typeLong ?? '') ?? 0;
 
 			return res * ($sortDirection === 'asc' ? 1 : -1);
+		}).filter(file => {
+			return searchFilter.test(file.filename);
 		});
 
 		return [
@@ -74,27 +77,27 @@
 	const handleKeyDown = (e: KeyboardEvent) => {
 		e.preventDefault();
 		if (e.key === 'ArrowUp') {
-			if (e.shiftKey) {
-				selectedIndexEnd = Math.max(0, selectedIndexEnd-1);
-			}
-			else {
-				selectedIndexStart = selectedIndexEnd = Math.max(0, selectedIndexEnd-1);
+			selectedIndexEnd = selectedIndexEnd-1;
+			if (!e.shiftKey) {
+				selectedIndexStart = selectedIndexEnd;
 			}
 		} else if (e.key === 'ArrowDown') {
-			if (e.shiftKey) {
-				selectedIndexEnd = Math.min(filesWithBack.length - 1, selectedIndexEnd+1);
-			}
-			else {
-				selectedIndexStart = selectedIndexEnd = Math.min(filesWithBack.length - 1, selectedIndexEnd+1);
+			selectedIndexEnd = selectedIndexEnd+1;
+			if (!e.shiftKey) {
+				selectedIndexStart = selectedIndexEnd;
 			}
 		} else if (e.key === '/') {
 			searchBar.focus();
-		} else if (e.key == '?') {
+		} else if (e.key === '?') {
 			pwdBar.focus();
 		}
+		selectedIndexStart = Math.min(Math.max(selectedIndexStart, 1), filesWithBack.length-1);
+		selectedIndexEnd = Math.min(Math.max(selectedIndexEnd, 1), filesWithBack.length-1);
 	};
 
 	const handleItemClick = (fileIndex: number, e: MouseEvent) => {
+		if (fileIndex === 0) return;
+
 		if (e.shiftKey) {
 			selectedIndexEnd = fileIndex;
 		} else {
@@ -102,11 +105,18 @@
 		}
 	};
 
-	const searchKeyDown = (e: KeyboardEvent) => {
-		console.log(e.key)
-		if (e.key == 'Escape') {
+	const escapeItemsMenu = (e: KeyboardEvent) => {
+		if (e.key === 'Escape') {
 			e.preventDefault();
 			itemsMenu.focus();
+		}
+	};
+
+	const searchKeyDown = (e: KeyboardEvent) => {
+		escapeItemsMenu(e);
+
+		if (e.key === 'Enter') {
+			searchFilter = new RegExp($searchText);
 		}
 	};
 
@@ -114,9 +124,9 @@
 		const i = selectedIndexEnd;
 		if (i < 0) return;
 
-		const row = rowEls[i];
+		const row = rowEls[i === 1 ? 0 : i];
 		if (!row) return;
-
+		
 		row.scrollIntoView({
 			block: 'nearest',
 			behavior: 'auto'
@@ -133,7 +143,7 @@
 			onfocusin={pwdFocusIn}
 			onfocusout={pwdFocusOut}
 			bind:this={pwdBar}
-			onkeydown={searchKeyDown}
+			onkeydown={escapeItemsMenu}
 		/>
 	</div>
 
