@@ -8,10 +8,12 @@
 		"class": className,
 		files = [],
 		pwd = $bindable(''),
+		label,
 	} : {
 		"class": string;
 		files: LocalFile[];
 		pwd: string;
+		label: string;
 	} = $props();
 
 	const searchText = writable('');
@@ -136,11 +138,12 @@
 </script>
 
 <div class="flex flex-col {className} h-full min-h-0 box-border">
+	<p class="p-2 text-center text-xl text-fg-2">{label}</p>
 	<div class="bg-bg-2 p-2 text-sm text-primary font-bold">
 		<input
 			type="text"
 			bind:value={pwd}
-			class="w-full border-none outline-none"
+			class="w-full border-none disabled:text-primary/50 outline-none"
 			onfocusin={pwdFocusIn}
 			onfocusout={pwdFocusOut}
 			bind:this={pwdBar}
