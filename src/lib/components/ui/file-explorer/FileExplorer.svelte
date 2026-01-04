@@ -51,7 +51,7 @@
 		}).filter(file => {
 			return searchFilter.test(file.filename);
 		});
-
+		
 		return [
 			{ filename: "..", lastModified: "", type: "back", size: 0 },
 			...filesCopy
@@ -116,6 +116,7 @@
 		escapeItemsMenu(e);
 
 		if (e.key === 'Enter') {
+			selectedIndexStart = selectedIndexEnd = -1;
 			searchFilter = new RegExp($searchText);
 		}
 	};
