@@ -2,7 +2,7 @@ interface LocalFile {
 	filename: string;
 	size?: number;
 	lastModified: string;
-	type?: string;
+	fileType?: string;
 	typeLong?: string;
 }
 
@@ -16,6 +16,7 @@ import XlsIcon from './icons/excel_icon.png';
 import PdfIcon from './icons/pdf_icon.png';
 import ExeIcon from './icons/exe_icon.png';
 import BackIcon from './icons/back_icon.png';
+import UnkIcon from './icons/unk_icon.png';
 
 
 export function typeToIcon(type: string) {
@@ -30,6 +31,7 @@ export function typeToIcon(type: string) {
 		case "pdf": return PdfIcon;
 		case "exe": return ExeIcon;
 		case "back": return BackIcon;
+		default: return UnkIcon;
 	}
 	return null;
 }

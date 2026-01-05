@@ -13,14 +13,28 @@
 		locked = $bindable(false),
 		lockIcon : LockIcon,
 		unlockIcon : UnlockIcon,
+
+		onGoBack,
+		onChangeDir,
+		onFileAction,
+		onSetAbsolutePath,
+		onLockChange,
+		onRefresh,
 	} : {
 		"class": string;
 		files: LocalFile[];
 		pwd: string;
 		label: string;
 		locked: boolean;
-		lockIcon: Component<IconProps, {}>,
-		unlockIcon: Component<IconProps, {}>
+		lockIcon: Component<IconProps, {}>;
+		unlockIcon: Component<IconProps, {}>;
+
+		onGoBack: () => void;
+		onChangeDir: (newDir: string) => void;
+		onFileAction: (...filename: string[]) => void;
+		onSetAbsolutePath: (path: string) => boolean;
+		onLockChange: (value: boolean) => boolean;
+		onRefresh: () => void;
 	} = $props();
 
 	const searchText = writable('');
@@ -62,7 +76,7 @@
 		});
 		
 		return [
-			{ filename: "..", lastModified: "", type: "back", size: 0 },
+			{ filename: "..", lastModified: "", fileType: "back", size: 0 },
 			...filesCopy
 		];
 	});
@@ -95,6 +109,19 @@
 			if (!e.shiftKey) {
 				selectedIndexStart = selectedIndexEnd;
 			}
+		} else if (e.key === 'ArrowLeft') {
+			onGoBack();
+		} else if (e.key === 'ArrowRight') {
+			const selectedFiles = filesWithBack.slice(selectedIndexStart, selectedIndexEnd + 1);
+			if (selectedFiles.length === 1 && selectedFiles[0].fileType === "folder") {
+				onChangeDir(selectedFiles[0].filename);
+				return;
+			}
+			if (selectedFiles.some(f => f.fileType === "folder")) {
+				// TODO: error
+				return;
+			}
+			onFileAction(...selectedFiles.map(f => f.filename));
 		} else if (e.key === '/') {
 			searchBar.focus();
 		} else if (e.key === '?') {
@@ -114,11 +141,31 @@
 		}
 	};
 
+	const handleItemDoubleClick = (file: LocalFile) => {
+		if (file.fileType === "back") {
+			onGoBack();
+		} else if (file.fileType == "folder") {
+			onChangeDir(file.filename);
+		} else {
+			onFileAction(file.filename);
+		}
+	};
+
 	const escapeItemsMenu = (e: KeyboardEvent) => {
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			itemsMenu.focus();
 		}
+	};
+
+	const pwdKeyDown = (e: KeyboardEvent) => {
+		if (e.key === 'Enter') {
+			if (onSetAbsolutePath(pwd)) {
+				oldPwd = pwd;
+			}
+		}
+
+		escapeItemsMenu(e);
 	};
 
 	const searchKeyDown = (e: KeyboardEvent) => {
@@ -127,6 +174,12 @@
 		if (e.key === 'Enter') {
 			selectedIndexStart = selectedIndexEnd = -1;
 			searchFilter = new RegExp($searchText);
+		}
+	};
+
+	const handleLockClick = () => {
+		if (onLockChange(!locked)) {
+			locked = !locked;
 		}
 	};
 
@@ -154,13 +207,13 @@
 			onfocusin={pwdFocusIn}
 			onfocusout={pwdFocusOut}
 			bind:this={pwdBar}
-			onkeydown={escapeItemsMenu}
+			onkeydown={pwdKeyDown}
 		/>
-		<RotateCwIcon class="cursor-pointer text-fg-3 hover:text-fg-0 transition-colors duration-300" />
+		<RotateCwIcon class="cursor-pointer text-fg-3 hover:text-fg-0 transition-colors duration-300" onclick={onRefresh} />
 		{#if locked}
-			<UnlockIcon class="cursor-pointer text-fg-2 hover:text-primary transition-colors duration-300" />
+			<UnlockIcon class="cursor-pointer text-fg-2 hover:text-primary transition-colors duration-300" onclick={handleLockClick} />
 		{:else}
-			<LockIcon class="cursor-pointer text-fg-2 hover:text-primary transition-colors duration-300" />
+			<LockIcon class="cursor-pointer text-fg-2 hover:text-primary transition-colors duration-300" onclick={handleLockClick} />
 		{/if}
 	</div>
 
@@ -191,16 +244,17 @@
 					bind:this={rowEls[fileIndex]}
 					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm box-border outline-none
 					${fileIndex >= Math.min(selectedIndexStart, selectedIndexEnd) && fileIndex <= Math.max(selectedIndexStart, selectedIndexEnd)
-						? "bg-primary/20 shadow-[inset_0_0_0_1px] shadow-primary"
+						? `shadow-[inset_0_0_0_1px] ${locked ? "shadow-fg-5 bg-fg-5/20" : "shadow-primary bg-primary/20"}`
 						: "hover:bg-bg-2/50"}`}
 					role="button"
 					onclick={(e) => handleItemClick(fileIndex, e)}
+					ondblclick={() => handleItemDoubleClick(file)}
 					onkeydown={() => {}}
 					tabindex="-1"
 				>
 					<div class="py-2 pl-2">
 						<img
-							src={typeToIcon(file.type ?? "")}
+							src={typeToIcon(file.fileType ?? "")}
 							class="h-6"
 							alt="file-icon"
 						/>

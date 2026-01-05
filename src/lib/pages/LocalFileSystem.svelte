@@ -3,18 +3,14 @@
 	import type { LocalFile } from "$lib/components/ui/file-explorer/utils";
 	import * as Select from "$lib/components/ui/select/index";
 	import { EyeOffIcon, LockIcon, LockOpenIcon, ScanEyeIcon } from "@lucide/svelte";
+    import { invoke } from '@tauri-apps/api/core';
+	import { onMount } from "svelte";
 
-    const files : LocalFile[] = [
-        { filename: 'Hello Wolrd', lastModified: '2024-06-01 10:00', size: 1000, typeLong: 'File Folder', type: 'folder'},
-        { filename: 'document.txt', lastModified: '2024-06-01 10:00', size: 1000, typeLong: 'Text File', type: 'text'},
-        { filename: 'image.png', lastModified: '2024-05-28 14:30', size: 1000, typeLong: 'Image File', type: 'image'},
-        { filename: 'presentation.pptx', lastModified: '2024-05-20 09:15', size: 1000, typeLong: 'Presentation File', type: 'ppt'},
-        { filename: 'document.docx', lastModified: '2024-05-20 09:15', size: 100050, typeLong: 'Document File', type: 'doc'},
-        { filename: 'sheet.xls', lastModified: '2024-05-20 09:15', size: 1000, typeLong: 'Spreadsheet File', type: 'xls'},
-        { filename: 'archive.zip', lastModified: '2024-04-15 16:45', size: 1000, typeLong: 'Compressed Folder', type: 'zip' },
-        { filename: 'info.pdf', lastModified: '2024-04-15 16:45', size: 1000, typeLong: 'PDF Document', type: 'pdf'},
-        { filename: 'game.exe', lastModified: '2024-04-15 16:45', size: 1000, typeLong: 'Executable File', type: 'exe'}
-    ];
+    let sourceFiles: LocalFile[] = $state([]);
+    let sourceCwd: string = $state('');
+
+    let destFiles: LocalFile[] = $state([]);
+    let destCwd: string = $state('');
 
     let algo = $state('');
     let mode = $state('');
@@ -42,6 +38,35 @@
     const triggerContentMode = $derived(
         blockModes.find(m => m.value === mode)?.label ?? "Select Mode"
     );
+
+    const loadFiles = (source: boolean) => {
+        invoke('get_files', { source }).then((res: any) => {
+            if (source) {
+                sourceFiles = res.files as LocalFile[];
+                sourceCwd = res.pwd as string;
+            } else {
+                destFiles = res.files as LocalFile[];
+                destCwd = res.pwd as string;
+            }
+        });
+    };
+
+    const changeDir = (newDir: string, source: boolean) => {
+        invoke('change_dir', { newDir, source }).then(() => {
+            loadFiles(source);
+        });
+    };
+
+    const goDirBack = (source: boolean) => {
+        invoke('go_dir_back', { source }).then(() => {
+            loadFiles(source);
+        });
+    }
+
+    onMount(() => {
+        loadFiles(true);
+        loadFiles(false);
+    });
 </script>
 
 <div class="flex flex-wrap items-center px-5 py-1">
@@ -114,29 +139,41 @@
     </div>
     <button
         class="bg-primary hover:bg-primary/60 text-bg-0 dark:text-fg-0 px-4 py-3 rounded-sm ml-3 cursor-pointer transition-colors duration-300"
-    >{operation === 'enc' ? 'Encryption' : 'Decryption'}</button>
+    >{operation === 'enc' ? 'Encrypt' : 'Decrypt'}</button>
 </div>
 <div class="flex flex-1 min-h-0">
     <div class="flex-1 p-4 min-h-0 overflow-hidden">
         <FileExplorer 
             class="" 
-            pwd="/home/lazarm" 
-            files={files} 
+            bind:pwd={sourceCwd}
+            files={sourceFiles} 
             label="Source Directory" 
             bind:locked={sourceWatch}
             lockIcon={ScanEyeIcon}
             unlockIcon={EyeOffIcon}
+            onGoBack={() => goDirBack(true) }
+            onChangeDir={dir => changeDir(dir, true)}
+            onFileAction={() => {}}
+            onSetAbsolutePath={() => true}
+            onLockChange={() => true}
+            onRefresh={() => {}}
         />
     </div>
     <div class="flex-1 p-4 min-h-0 overflow-hidden">
         <FileExplorer 
             class="" 
-            pwd="/home/lazarm" 
-            files={files} 
+            pwd={destCwd} 
+            files={destFiles} 
             label="Destination Directory" 
             bind:locked={destLocked}
             lockIcon={LockIcon}
             unlockIcon={LockOpenIcon}
+            onGoBack={() => goDirBack(false) }
+            onChangeDir={dir => changeDir(dir, false)}
+            onFileAction={() => {}}
+            onSetAbsolutePath={() => false}
+            onLockChange={() => false}
+            onRefresh={() => {}}
         />
     </div>
 </div>

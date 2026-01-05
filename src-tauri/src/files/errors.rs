@@ -1,9 +1,11 @@
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum FilesError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error(transparent)]
-    Utf8(#[from] std::string::FromUtf8Error),
+    #[error("Invalid UTF-8 in filename")]
+    InvalidFilename,
+    #[error("File Explorer Internal Error")]
+    ExplorerInternalError,
 }
 
 #[derive(serde::Serialize)]
@@ -11,10 +13,11 @@ pub enum Error {
 #[serde(rename_all = "camelCase")]
 enum ErrorName {
     Io(String),
-    FromUtf8Error(String),
+    InvalidFilename(String),
+    FileExplorerInternalError(String),
 }
 
-impl serde::Serialize for Error {
+impl serde::Serialize for FilesError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
@@ -22,7 +25,8 @@ impl serde::Serialize for Error {
         let message = self.to_string();
         let name = match self {
             Self::Io(_) => ErrorName::Io(message),
-            Self::Utf8(_) => ErrorName::FromUtf8Error(message),
+            Self::InvalidFilename => ErrorName::InvalidFilename(message),
+            FilesError::ExplorerInternalError => ErrorName::FileExplorerInternalError(message),
         };
         name.serialize(serializer)
     }
