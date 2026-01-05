@@ -2,18 +2,25 @@
 	import type { LocalFile } from '$lib/components/ui/file-explorer/utils';
 	import { sizeToString, typeToIcon } from '$lib/components/ui/file-explorer/utils';
 	import { writable } from 'svelte/store';
-	import { ArrowDown, ArrowUp } from '@lucide/svelte';
+	import { ArrowDown, ArrowUp, RotateCwIcon, type IconProps } from '@lucide/svelte';
+	import type { Component } from 'svelte';
 
 	let {
 		"class": className,
 		files = [],
 		pwd = $bindable(''),
 		label,
+		locked = $bindable(false),
+		lockIcon : LockIcon,
+		unlockIcon : UnlockIcon,
 	} : {
 		"class": string;
 		files: LocalFile[];
 		pwd: string;
 		label: string;
+		locked: boolean;
+		lockIcon: Component<IconProps, {}>,
+		unlockIcon: Component<IconProps, {}>
 	} = $props();
 
 	const searchText = writable('');
@@ -139,7 +146,7 @@
 
 <div class="flex flex-col {className} h-full min-h-0 box-border">
 	<p class="p-2 text-center text-xl text-fg-2">{label}</p>
-	<div class="bg-bg-2 p-2 text-sm text-primary font-bold">
+	<div class="flex bg-bg-2 p-2 text-sm text-primary font-bold gap-2">
 		<input
 			type="text"
 			bind:value={pwd}
@@ -149,6 +156,12 @@
 			bind:this={pwdBar}
 			onkeydown={escapeItemsMenu}
 		/>
+		<RotateCwIcon class="cursor-pointer text-fg-3 hover:text-fg-0 transition-colors duration-300" />
+		{#if locked}
+			<UnlockIcon class="cursor-pointer text-fg-2 hover:text-primary transition-colors duration-300" />
+		{:else}
+			<LockIcon class="cursor-pointer text-fg-2 hover:text-primary transition-colors duration-300" />
+		{/if}
 	</div>
 
 	<div 
@@ -176,7 +189,7 @@
 			{#each filesWithBack as file, fileIndex}
 				<div
 					bind:this={rowEls[fileIndex]}
-					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm box-border
+					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm box-border outline-none
 					${fileIndex >= Math.min(selectedIndexStart, selectedIndexEnd) && fileIndex <= Math.max(selectedIndexStart, selectedIndexEnd)
 						? "bg-primary/20 shadow-[inset_0_0_0_1px] shadow-primary"
 						: "hover:bg-bg-2/50"}`}

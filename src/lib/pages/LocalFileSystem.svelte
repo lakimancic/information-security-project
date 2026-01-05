@@ -2,6 +2,7 @@
 	import FileExplorer from "$lib/components/ui/file-explorer/FileExplorer.svelte";
 	import type { LocalFile } from "$lib/components/ui/file-explorer/utils";
 	import * as Select from "$lib/components/ui/select/index";
+	import { EyeOffIcon, LockIcon, LockOpenIcon, ScanEyeIcon } from "@lucide/svelte";
 
     const files : LocalFile[] = [
         { filename: 'Hello Wolrd', lastModified: '2024-06-01 10:00', size: 1000, typeLong: 'File Folder', type: 'folder'},
@@ -18,6 +19,8 @@
     let algo = $state('');
     let mode = $state('');
     let operation = $state<'dec'|'enc'>('enc');
+    let destLocked = $state(false);
+    let sourceWatch = $state(false);
 
     const streamCiphers = [
         { value: "stream:a5/1", label: "A5/1" }
@@ -41,7 +44,7 @@
     );
 </script>
 
-<div class="flex items-center px-5 py-1">
+<div class="flex flex-wrap items-center px-5 py-1">
     <p class="mr-3">Choose algorithm:</p>
     <Select.Root type="single" bind:value={algo}>
         <Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
@@ -115,9 +118,25 @@
 </div>
 <div class="flex flex-1 min-h-0">
     <div class="flex-1 p-4 min-h-0 overflow-hidden">
-        <FileExplorer class="" pwd="/home/lazarm" files={files} label="Source Directory" />
+        <FileExplorer 
+            class="" 
+            pwd="/home/lazarm" 
+            files={files} 
+            label="Source Directory" 
+            bind:locked={sourceWatch}
+            lockIcon={ScanEyeIcon}
+            unlockIcon={EyeOffIcon}
+        />
     </div>
     <div class="flex-1 p-4 min-h-0 overflow-hidden">
-        <FileExplorer class="" pwd="/home/lazarm" files={files} label="Destination Directory" />
+        <FileExplorer 
+            class="" 
+            pwd="/home/lazarm" 
+            files={files} 
+            label="Destination Directory" 
+            bind:locked={destLocked}
+            lockIcon={LockIcon}
+            unlockIcon={LockOpenIcon}
+        />
     </div>
 </div>

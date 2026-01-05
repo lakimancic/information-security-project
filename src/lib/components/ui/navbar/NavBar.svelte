@@ -38,7 +38,7 @@
 					<IconComponent class="size-12 p-3 box-content text-fg-3" />
 				</Tooltip.Trigger>
 				<Tooltip.Content
-					class="z-10 bg-bg-0 text-fg-3 px-4 py-3 ml-2 border border-bg-2 text-md rounded-md"
+					class="z-10 bg-bg-1 text-fg-3 px-4 py-3 ml-2 border border-bg-5 text-md rounded-md"
 					side="right"
 				>
 					{navItem.name}

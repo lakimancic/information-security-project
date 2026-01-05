@@ -14,13 +14,13 @@
 	</div>
 	<div class="flex mt-10 gap-10">
 		<button
-			class="flex items-center gap-2 bg-primary text-bg-0 dark:text-fg-0 px-5 py-3 text-2xl font-bold cursor-pointer rounded-md hover:opacity-80 duration-300"
+			class="flex items-center gap-2 bg-primary text-bg-0 dark:text-fg-0 px-5 py-3 text-2xl font-bold cursor-pointer rounded-md hover:bg-primary/80 duration-300"
 			onclick={() => navigate("/local")}
 		>
 			<HardDrive class="size-7" /> Local File System
 		</button>
 		<button
-			class="flex items-center gap-2 bg-primary text-bg-0 dark:text-fg-0 px-5 py-3 text-2xl font-bold cursor-pointer rounded-md hover:opacity-80 duration-300"
+			class="flex items-center gap-2 bg-primary text-bg-0 dark:text-fg-0 px-5 py-3 text-2xl font-bold cursor-pointer rounded-md hover:bg-primary/80 duration-300"
 			onclick={() => navigate("/remote")}
 		>
 			<Router class="size-7" />Remote Computer
