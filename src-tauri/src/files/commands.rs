@@ -25,28 +25,41 @@ pub async fn change_dir(
     state: tauri::State<'_, AppState>,
     new_dir: String,
     source: bool
-) -> Result<(), FilesError> {
+) -> Result<bool, FilesError> {
     let mut explorer = if source {
         state.source_explorer.lock()
     } else {
         state.dest_explorer.lock()
     }.map_err(|_| FilesError::ExplorerInternalError)?;
 
-    explorer.change_dir(new_dir);
-    Ok(())
+    Ok(explorer.change_dir(new_dir))
 }
 
 #[tauri::command]
 pub async fn go_dir_back(
     state: tauri::State<'_, AppState>,
     source: bool
-) -> Result<(), FilesError> {
+) -> Result<bool, FilesError> {
     let mut explorer = if source {
         state.source_explorer.lock()
     } else {
         state.dest_explorer.lock()
     }.map_err(|_| FilesError::ExplorerInternalError)?;
-    explorer.go_back();
 
-    Ok(())
+    Ok(explorer.go_back())
+}
+
+#[tauri::command]
+pub async fn set_current_dir(
+    state: tauri::State<'_, AppState>,
+    new_dir: String,
+    source: bool
+) -> Result<bool, FilesError> {
+    let mut explorer = if source {
+        state.source_explorer.lock()
+    } else {
+        state.dest_explorer.lock()
+    }.map_err(|_| FilesError::ExplorerInternalError)?;
+
+    Ok(explorer.set_current_path(new_dir))
 }

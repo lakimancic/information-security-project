@@ -29,10 +29,10 @@
 		lockIcon: Component<IconProps, {}>;
 		unlockIcon: Component<IconProps, {}>;
 
-		onGoBack: () => void;
-		onChangeDir: (newDir: string) => void;
+		onGoBack: () => Promise<boolean>;
+		onChangeDir: (newDir: string) => Promise<boolean>;
 		onFileAction: (...filename: string[]) => void;
-		onSetAbsolutePath: (path: string) => boolean;
+		onSetAbsolutePath: (path: string) => Promise<boolean>;
 		onLockChange: (value: boolean) => boolean;
 		onRefresh: () => void;
 	} = $props();
@@ -40,6 +40,8 @@
 	const searchText = writable('');
 	let searchFilter = $state(new RegExp(""));
 	let oldPwd = $state('');
+
+	const indexStack = $state<number[]>([]);
 
 	let searchBar : HTMLInputElement;
 	let pwdBar : HTMLInputElement;
@@ -81,12 +83,36 @@
 		];
 	});
 
+	const clearSearch = () => {
+		searchFilter = new RegExp('');
+		searchText.update(() => '');
+	};
+
 	const pwdFocusIn = () => {
 		oldPwd = pwd;
 	};
 
 	const pwdFocusOut = () => {
 		pwd = oldPwd;
+	};
+
+	const handleGoBack = async () => {
+		if (locked) return;
+
+		if (await onGoBack()) {
+			clearSearch();
+			selectedIndexEnd = selectedIndexStart = indexStack.pop() ?? -1;
+		}
+	};
+
+	const handleChangeDir = async (newDir: string, index: number) => {
+		if (locked) return;
+
+		if (await onChangeDir(newDir)) {
+			clearSearch();
+			indexStack.push(index);
+			selectedIndexEnd = selectedIndexStart = -1;
+		}
 	};
 
 	const handleColumnClick = (colName: SortColumn) => {
@@ -110,11 +136,11 @@
 				selectedIndexStart = selectedIndexEnd;
 			}
 		} else if (e.key === 'ArrowLeft') {
-			onGoBack();
+			handleGoBack();
 		} else if (e.key === 'ArrowRight') {
 			const selectedFiles = filesWithBack.slice(selectedIndexStart, selectedIndexEnd + 1);
 			if (selectedFiles.length === 1 && selectedFiles[0].fileType === "folder") {
-				onChangeDir(selectedFiles[0].filename);
+				handleChangeDir(selectedFiles[0].filename, selectedIndexEnd);
 				return;
 			}
 			if (selectedFiles.some(f => f.fileType === "folder")) {
@@ -141,11 +167,11 @@
 		}
 	};
 
-	const handleItemDoubleClick = (file: LocalFile) => {
+	const handleItemDoubleClick = (file: LocalFile, index: number) => {
 		if (file.fileType === "back") {
-			onGoBack();
+			handleGoBack();
 		} else if (file.fileType == "folder") {
-			onChangeDir(file.filename);
+			handleChangeDir(file.filename, index);
 		} else {
 			onFileAction(file.filename);
 		}
@@ -158,10 +184,12 @@
 		}
 	};
 
-	const pwdKeyDown = (e: KeyboardEvent) => {
+	const pwdKeyDown = async (e: KeyboardEvent) => {
 		if (e.key === 'Enter') {
-			if (onSetAbsolutePath(pwd)) {
+			clearSearch();
+			if (await onSetAbsolutePath(pwd)) {
 				oldPwd = pwd;
+				clearSearch();
 			}
 		}
 
@@ -181,6 +209,12 @@
 		if (onLockChange(!locked)) {
 			locked = !locked;
 		}
+	};
+
+	const handleRefreshClick = () => {
+		if (locked) return;
+
+		onRefresh();
 	};
 
 	$effect(() => {
@@ -208,8 +242,13 @@
 			onfocusout={pwdFocusOut}
 			bind:this={pwdBar}
 			onkeydown={pwdKeyDown}
+			disabled={locked}
 		/>
-		<RotateCwIcon class="cursor-pointer text-fg-3 hover:text-fg-0 transition-colors duration-300" onclick={onRefresh} />
+		<RotateCwIcon 
+			class="cursor-pointer text-fg-3 hover:text-fg-0 transition-colors duration-300 data-[disabled=true]:text-fg-3/60" 
+			onclick={handleRefreshClick}
+			data-disabled={locked}
+		/>
 		{#if locked}
 			<UnlockIcon class="cursor-pointer text-fg-2 hover:text-primary transition-colors duration-300" onclick={handleLockClick} />
 		{:else}
@@ -248,7 +287,7 @@
 						: "hover:bg-bg-2/50"}`}
 					role="button"
 					onclick={(e) => handleItemClick(fileIndex, e)}
-					ondblclick={() => handleItemDoubleClick(file)}
+					ondblclick={() => handleItemDoubleClick(file, fileIndex)}
 					onkeydown={() => {}}
 					tabindex="-1"
 				>
@@ -284,9 +323,10 @@
 			type="text"
 			placeholder="Search..."
 			bind:value={$searchText}
-			class="w-full p-2 border border-bg-4 rounded outline-none"
+			class="w-full p-2 border border-bg-4 rounded outline-none disabled:text-fg-2/60"
 			bind:this={searchBar}
 			onkeydown={searchKeyDown}
+			disabled={locked}
 		/>
 	</div>
 </div>

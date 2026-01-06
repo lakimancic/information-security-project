@@ -1,7 +1,7 @@
 mod files;
 
 use std::sync::Mutex;
-use crate::files::commands::{get_files, change_dir, go_dir_back};
+use crate::files::commands::{get_files, change_dir, go_dir_back, set_current_dir};
 use crate::files::file_explorer::FileExplorer;
 
 struct AppState {
@@ -27,7 +27,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_files, change_dir, go_dir_back])
+        .invoke_handler(tauri::generate_handler![get_files, change_dir, go_dir_back, set_current_dir])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,8 +1,10 @@
 <script lang="ts">
 	import FileExplorer from "$lib/components/ui/file-explorer/FileExplorer.svelte";
 	import type { LocalFile } from "$lib/components/ui/file-explorer/utils";
+	import KeyDialog from "$lib/components/ui/key-dialog/KeyDialog.svelte";
 	import * as Select from "$lib/components/ui/select/index";
-	import { EyeOffIcon, LockIcon, LockOpenIcon, ScanEyeIcon } from "@lucide/svelte";
+	import type { Key } from "$lib/types/crypto";
+	import { EyeOffIcon, KeySquareIcon, LockIcon, LockOpenIcon, ScanEyeIcon, XIcon } from "@lucide/svelte";
     import { invoke } from '@tauri-apps/api/core';
 	import { onMount } from "svelte";
 
@@ -15,6 +17,11 @@
     let algo = $state('');
     let mode = $state('');
     let operation = $state<'dec'|'enc'>('enc');
+    let key = $state<Key|null>({
+        label: "hello",
+        keyHex: "0232"
+    });
+
     let destLocked = $state(false);
     let sourceWatch = $state(false);
 
@@ -39,8 +46,8 @@
         blockModes.find(m => m.value === mode)?.label ?? "Select Mode"
     );
 
-    const loadFiles = (source: boolean) => {
-        invoke('get_files', { source }).then((res: any) => {
+    const loadFiles = async (source: boolean) => {
+        await invoke('get_files', { source }).then((res: any) => {
             if (source) {
                 sourceFiles = res.files as LocalFile[];
                 sourceCwd = res.pwd as string;
@@ -51,17 +58,38 @@
         });
     };
 
-    const changeDir = (newDir: string, source: boolean) => {
-        invoke('change_dir', { newDir, source }).then(() => {
-            loadFiles(source);
-        });
+    const changeDir = async (newDir: string, source: boolean) => {
+        try {
+            const res : boolean = await invoke('change_dir', { newDir, source });
+            if (res) await loadFiles(source);
+
+            return res;
+        } catch(err) {
+            return false;
+        }
     };
 
-    const goDirBack = (source: boolean) => {
-        invoke('go_dir_back', { source }).then(() => {
-            loadFiles(source);
-        });
-    }
+    const goDirBack = async (source: boolean) => {
+        try {
+            const res : boolean = await invoke('go_dir_back', { source });
+            if (res) await loadFiles(source);
+
+            return res;
+        } catch(err) {
+            return false;
+        }
+    };
+
+    const setAbsolutePath = async (newDir: string, source: boolean) => {
+        try {
+            const res : boolean = await invoke('set_current_dir', { newDir, source });
+            if (res) await loadFiles(source);
+
+            return res;
+        } catch(err) {
+            return false;
+        }
+    };
 
     onMount(() => {
         loadFiles(true);
@@ -126,7 +154,10 @@
             </Select.Content>
         </Select.Root>
     {/if}
-    <p class="ml-auto mr-2">Operation:</p>
+    <p class="ml-auto">Key:</p>
+    <p class="mx-2 {key !== null ? "text-primary font-black" : "text-fg-4"}">{key?.label ?? "No key selected"}</p>
+    <KeyDialog />
+    <p class="mr-2">Operation:</p>
     <div class="flex border border-bg-4 p-1 rounded-sm gap-2">
         <button 
             class="border-2 {operation === 'dec' ? 'border-bg-4' : 'border-primary'} p-2 rounded-sm cursor-pointer"
@@ -151,12 +182,12 @@
             bind:locked={sourceWatch}
             lockIcon={ScanEyeIcon}
             unlockIcon={EyeOffIcon}
-            onGoBack={() => goDirBack(true) }
-            onChangeDir={dir => changeDir(dir, true)}
+            onGoBack={async () => await goDirBack(true) }
+            onChangeDir={async dir => await changeDir(dir, true)}
             onFileAction={() => {}}
-            onSetAbsolutePath={() => true}
+            onSetAbsolutePath={async newDir => await setAbsolutePath(newDir, true)}
             onLockChange={() => true}
-            onRefresh={() => {}}
+            onRefresh={() => loadFiles(true)}
         />
     </div>
     <div class="flex-1 p-4 min-h-0 overflow-hidden">
@@ -164,16 +195,16 @@
             class="" 
             pwd={destCwd} 
             files={destFiles} 
-            label="Destination Directory" 
+            label={`Destination Directory${destLocked ? " (Locked)" : ""}`} 
             bind:locked={destLocked}
             lockIcon={LockIcon}
             unlockIcon={LockOpenIcon}
             onGoBack={() => goDirBack(false) }
             onChangeDir={dir => changeDir(dir, false)}
             onFileAction={() => {}}
-            onSetAbsolutePath={() => false}
-            onLockChange={() => false}
-            onRefresh={() => {}}
+            onSetAbsolutePath={async newDir => await setAbsolutePath(newDir, false)}
+            onLockChange={() => true}
+            onRefresh={() => loadFiles(false)}
         />
     </div>
 </div>
