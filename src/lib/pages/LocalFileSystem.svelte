@@ -3,7 +3,7 @@
 	import type { LocalFile } from "$lib/components/ui/file-explorer/utils";
 	import KeyDialog from "$lib/components/ui/key-dialog/KeyDialog.svelte";
 	import * as Select from "$lib/components/ui/select/index";
-	import type { Key } from "$lib/types/crypto";
+	import { type CipherTag, type Key } from "$lib/types/crypto";
 	import { EyeOffIcon, KeySquareIcon, LockIcon, LockOpenIcon, ScanEyeIcon, XIcon } from "@lucide/svelte";
     import { invoke } from '@tauri-apps/api/core';
 	import { onMount } from "svelte";
@@ -14,8 +14,9 @@
     let destFiles: LocalFile[] = $state([]);
     let destCwd: string = $state('');
 
-    let algo = $state('');
-    let mode = $state('');
+    let algoStr = $state('');
+    let modeStr = $state('');
+
     let operation = $state<'dec'|'enc'>('enc');
     let key = $state<Key|null>({
         label: "hello",
@@ -29,21 +30,28 @@
         { value: "stream:a5/1", label: "A5/1" }
     ];
 
-    const blockCiphers = [
+    const blockCiphers : CipherTag[] = [
         { value: "block:xtea", label: "XTEA" }
     ];
 
-    const blockModes = [
+    const blockModes : CipherTag[] = [
         { value: "mode:ofb", label: "OFB" }
     ];
 
+    let algo = $derived.by(() => {
+        return [...blockCiphers, ...streamCiphers].find(v => v.value === algoStr) ?? null
+    });
+    let mode = $derived.by(() => {
+        return blockModes.find(v => v.value === modeStr) ?? null
+    });
+
     const triggerContent = $derived(
-        streamCiphers.find(c => c.value === algo)?.label ??
-        blockCiphers.find(c => c.value === algo)?.label ?? "Select Cipher"
+        streamCiphers.find(c => c.value === algoStr)?.label ??
+        blockCiphers.find(c => c.value === algoStr)?.label ?? "Select Cipher"
     );
 
     const triggerContentMode = $derived(
-        blockModes.find(m => m.value === mode)?.label ?? "Select Mode"
+        blockModes.find(m => m.value === modeStr)?.label ?? "Select Mode"
     );
 
     const loadFiles = async (source: boolean) => {
@@ -99,7 +107,7 @@
 
 <div class="flex flex-wrap items-center px-5 py-1">
     <p class="mr-3">Choose algorithm:</p>
-    <Select.Root type="single" bind:value={algo}>
+    <Select.Root type="single" bind:value={algoStr}>
         <Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
             {triggerContent}
         </Select.Trigger>
@@ -110,7 +118,7 @@
                     <Select.Item 
                         value={cipher.value}
                         label={cipher.label} 
-                        disabled={algo === cipher.value} 
+                        disabled={algoStr === cipher.value} 
                         class="hover:text-fg-0 hover:bg-bg-3/50"
                     >
                         {cipher.label}
@@ -123,7 +131,7 @@
                     <Select.Item 
                         value={cipher.value}
                         label={cipher.label} 
-                        disabled={algo === cipher.value} 
+                        disabled={algoStr === cipher.value} 
                         class="hover:text-fg-0 hover:bg-bg-3/50"
                     >
                         {cipher.label}
@@ -132,9 +140,9 @@
             </Select.Group>
         </Select.Content>
     </Select.Root>
-    {#if algo.startsWith("block:")}
+    {#if algoStr.startsWith("block:")}
         <p class="mx-3">Choose mode:</p>
-        <Select.Root type="single" bind:value={mode}>
+        <Select.Root type="single" bind:value={modeStr}>
             <Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
                 {triggerContentMode}
             </Select.Trigger>
@@ -144,7 +152,7 @@
                         <Select.Item 
                             value={blockMode.value}
                             label={blockMode.label} 
-                            disabled={mode === blockMode.value} 
+                            disabled={modeStr === blockMode.value} 
                             class="hover:text-fg-0 hover:bg-bg-3/50"
                         >
                             {blockMode.label}

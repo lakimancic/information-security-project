@@ -1,7 +1,12 @@
 interface Key {
     label: string;
     keyHex: string;
-    ivHex: string;
+    ivHex?: string;
 }
 
-export type { Key };
+interface CipherTag {
+    label: string;
+    value: string;
+}
+
+export type { Key, CipherTag };
