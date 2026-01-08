@@ -18,10 +18,7 @@
     let modeStr = $state('');
 
     let operation = $state<'dec'|'enc'>('enc');
-    let key = $state<Key|null>({
-        label: "hello",
-        keyHex: "0232"
-    });
+    let key = $state<Key|null>(null);
 
     let destLocked = $state(false);
     let sourceWatch = $state(false);
@@ -164,7 +161,7 @@
     {/if}
     <p class="ml-auto">Key:</p>
     <p class="mx-2 {key !== null ? "text-primary font-black" : "text-fg-4"}">{key?.label ?? "No key selected"}</p>
-    <KeyDialog />
+    <KeyDialog algo={algo} mode={mode} bind:outputKey={key} />
     <p class="mr-2">Operation:</p>
     <div class="flex border border-bg-4 p-1 rounded-sm gap-2">
         <button 

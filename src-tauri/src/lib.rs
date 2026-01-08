@@ -1,4 +1,5 @@
 mod files;
+mod crypto;
 
 use std::sync::Mutex;
 use crate::files::commands::{get_files, change_dir, go_dir_back, set_current_dir};

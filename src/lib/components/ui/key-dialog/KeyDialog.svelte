@@ -2,7 +2,17 @@
 	import { KeySquareIcon, XIcon } from "@lucide/svelte";
 	import { Dialog, Separator, Tabs } from "bits-ui";
     import * as Select from "$lib/components/ui/select/index";
-	import type { CipherTag } from "$lib/types/crypto";
+	import type { CipherTag, Key } from "$lib/types/crypto";
+
+    let {
+        algo,
+        mode,
+        outputKey = $bindable(null)
+    } : {
+        algo: CipherTag|null,
+        mode: CipherTag|null,
+        outputKey: Key|null,
+    } = $props();
 
     const keyNames = [
         'hello world',
@@ -10,15 +20,8 @@
         'alpha key',
     ];
 
-    let selectedKey = $state('');
-    let algo = $state<CipherTag|null>({
-        value: "stream:a5/1",
-        label: "A5/1"
-    });
-    let mode = $state<CipherTag|null>({
-        value: "cbc",
-        label: "CBC"
-    });
+    let selectedKey = $state(outputKey?.label ?? '');
+    let errorMsg = $state('');
 
     const triggerContentKey = $derived(
         keyNames.find(m => m === selectedKey) ?? "encryption_key_name"
@@ -26,8 +29,11 @@
 </script>
 
 <Dialog.Root>
-    <Dialog.Trigger>
-        <KeySquareIcon class="bg-bg-3 hover:bg-bg-4 rounded-md text-primary p-2 size-10 mr-5 cursor-pointer" />
+    <Dialog.Trigger 
+        disabled={algo === null || (algo.value.startsWith("block") && mode === null)}
+        class={algo === null || (algo.value.startsWith("block") && mode === null) ? "text-fg-3/40" : "text-primary"}
+    >
+        <KeySquareIcon class="bg-bg-3 hover:bg-bg-4 rounded-md p-2 size-10 mr-5 cursor-pointer" />
     </Dialog.Trigger>
     <Dialog.Portal>
         <Dialog.Overlay
@@ -94,6 +100,7 @@
                         placeholder="key_password"
                         class="outline-none border border-bg-5 min-w-40 text-md py-2 px-3 rounded-md w-full mt-2 mb-4 placeholder:text-fg-0/40"
                     />
+                    <p class="text-center text-error">{errorMsg}</p>
                     <div class="flex w-full justify-end mt-5">
                         <Dialog.Close
                             class="bg-primary px-4 py-3 font-semibold rounded-md cursor-pointer hover:bg-primary/70 transition-colors duration-300"
@@ -125,6 +132,7 @@
                         placeholder="confirm_password"
                         class="outline-none border border-bg-5 min-w-40 text-md py-2 px-3 rounded-md w-full mt-2 mb-4 placeholder:text-fg-0/40"
                     />
+                    <p class="text-center text-error">{errorMsg}</p>
                     <div class="flex w-full justify-end mt-5">
                         <Dialog.Close
                             class="bg-primary px-4 py-3 font-semibold rounded-md cursor-pointer hover:bg-primary/70 transition-colors duration-300"
