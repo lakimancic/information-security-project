@@ -7,6 +7,7 @@ mod stream;
 mod errors;
 mod block;
 mod cipher_factory;
+mod hash;
 
 pub enum CipherInstance {
     Stream(Box<dyn StreamCipher>),

@@ -1,6 +1,6 @@
 pub mod modes;
 pub mod xtea;
-mod aes256;
+pub mod aes256;
 
 use crate::crypto::errors::CryptoError;
 
