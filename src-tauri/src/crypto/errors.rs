@@ -23,6 +23,12 @@ pub enum CryptoError {
     #[error("Missing block mode")]
     MissingBlockMode,
 
+    #[error("Invalid padding")]
+    InvalidPadding,
+
+    #[error("Missing padding algorithm")]
+    MissingPaddingAlgorithm,
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }
