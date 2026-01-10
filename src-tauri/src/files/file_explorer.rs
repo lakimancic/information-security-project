@@ -30,6 +30,10 @@ impl FileExplorer {
         self.current_path.to_str().unwrap_or("").to_string()
     }
 
+    pub fn get_current_path_buf(&self) -> PathBuf {
+        self.current_path.clone()
+    }
+
     pub fn set_current_path(&mut self, path: String) -> bool {
         let new_path = PathBuf::from(path);
         if new_path.is_dir() {

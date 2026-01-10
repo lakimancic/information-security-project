@@ -98,6 +98,24 @@
         }
     };
 
+    const onFileAction = async (filename: string) => {
+        if (!key) return;
+
+        invoke("encrypt_file", { 
+            request: {
+                algorithm: algoStr,
+                mode: mode ? modeStr : undefined,
+                key: key.key,
+                iv: key.iv
+            },
+            file: filename
+        })
+        .then(() => {})
+        .catch(err => {
+            console.error(err);
+        })
+    };
+
     const onKeySet = (newKey: Key) => {
         cachedKeys[algoStr + ":" + modeStr] = newKey;
     };
@@ -209,7 +227,7 @@
             unlockIcon={EyeOffIcon}
             onGoBack={async () => await goDirBack(true) }
             onChangeDir={async dir => await changeDir(dir, true)}
-            onFileAction={() => {}}
+            onFileAction={onFileAction}
             onStopProcessingFile={() => {}}
             onSetAbsolutePath={async newDir => await setAbsolutePath(newDir, true)}
             onLockChange={() => true}

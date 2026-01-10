@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum CryptoError {
     #[error("Unknown cipher: {0}")]
     UnknownCipher(String),
@@ -32,9 +32,51 @@ pub enum CryptoError {
     #[error("Crypto Internal Error: {0}")]
     CryptoInternalError(String),
 
-    #[error("IO error: {0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    #[error("Error: {0}")]
-    Other(#[from]  tauri::Error),
+    #[error(transparent)]
+    Other(#[from] tauri::Error),
+}
+
+#[derive(serde::Serialize)]
+#[serde(tag = "name", content = "message")]
+#[serde(rename_all = "camelCase")]
+enum ErrorName {
+    UnknownCipher(String),
+    InvalidParams(String),
+    InvalidKeyLength(String),
+    InvalidIvLength(String),
+    EncryptionError(String),
+    InvalidBlockSize(String),
+    MissingBlockMode(String),
+    InvalidPadding(String),
+    MissingPaddingAlgorithm(String),
+    CryptoInternalError(String),
+    Io(String),
+    Other(String),
+}
+
+impl serde::Serialize for CryptoError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let message = self.to_string();
+        let name = match self {
+            Self::UnknownCipher(_) => ErrorName::UnknownCipher(message),
+            Self::InvalidParams(_) => ErrorName::InvalidParams(message),
+            Self::InvalidKeyLength => ErrorName::InvalidKeyLength(message),
+            Self::InvalidIvLength => ErrorName::InvalidIvLength(message),
+            Self::EncryptionError(_) => ErrorName::EncryptionError(message),
+            Self::InvalidBlockSize => ErrorName::InvalidBlockSize(message),
+            Self::MissingBlockMode => ErrorName::MissingBlockMode(message),
+            Self::InvalidPadding => ErrorName::InvalidPadding(message),
+            Self::MissingPaddingAlgorithm => ErrorName::MissingPaddingAlgorithm(message),
+            Self::CryptoInternalError(_) => ErrorName::CryptoInternalError(message),
+            Self::Io(_) => ErrorName::Io(message),
+            Self::Other(_) => ErrorName::Other(message),
+        };
+        name.serialize(serializer)
+    }
 }

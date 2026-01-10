@@ -1,7 +1,8 @@
 use std::{collections::HashMap, sync::{Arc, Mutex}, thread};
-
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Emitter;
+use crate::AppState;
 use crate::crypto::api::worker::encrypt_worker;
 use crate::crypto::CryptoRequest;
 use crate::crypto::errors::CryptoError;
@@ -15,12 +16,19 @@ pub type JobRegistry = Arc<Mutex<HashMap<String, CryptoJob>>>;
 fn spawn_encrypt_worker(
     app: tauri::AppHandle,
     jobs: JobRegistry,
+    input_path: &PathBuf,
+    output_path: &PathBuf,
     filename: String,
     request: CryptoRequest,
     cancel: Arc<AtomicBool>,
 ) {
+    let mut input_file = input_path.clone();
+    input_file.push(filename.clone());
+    let mut output_file = output_path.clone();
+    output_file.push(format!("{filename}.enc"));
+
     thread::spawn(move || {
-        let result = encrypt_worker(app.clone(), &filename, &request, cancel);
+        let result = encrypt_worker(app.clone(), input_file.as_ref(), output_file.as_ref(), &request, cancel);
         
         jobs.lock().unwrap().remove(&filename);
 
@@ -30,7 +38,8 @@ fn spawn_encrypt_worker(
     });
 }
 
-fn try_start_encrypt(
+pub fn try_start_encrypt(
+    state: tauri::State<'_, AppState>,
     app: tauri::AppHandle,
     jobs: JobRegistry,
     filename: String,
@@ -38,7 +47,16 @@ fn try_start_encrypt(
 ) -> Result<(), CryptoError> {
     let mut map = jobs
         .lock()
-        .map_err(|_| CryptoError::CryptoInternalError("Lock poisoned".into()))?;
+        .map_err(|e| CryptoError::CryptoInternalError(e.to_string()))?;
+
+    let source_explorer = state.source_explorer.lock()
+        .map_err(|e| CryptoError::CryptoInternalError(e.to_string()))?;
+
+    let destination_explorer = state.dest_explorer.lock()
+        .map_err(|e| CryptoError::CryptoInternalError(e.to_string()))?;
+
+    let source_path = source_explorer.get_current_path_buf();
+    let destination_path = destination_explorer.get_current_path_buf();
 
     if map.contains_key(&filename) {
         return Ok(());
@@ -54,7 +72,7 @@ fn try_start_encrypt(
     );
 
     drop(map);
-    spawn_encrypt_worker(app, jobs, filename, request, cancel);
+    spawn_encrypt_worker(app, jobs, &source_path, &destination_path, filename, request, cancel);
 
     Ok(())
 }
