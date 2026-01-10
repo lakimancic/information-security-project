@@ -29,6 +29,12 @@ pub enum CryptoError {
     #[error("Missing padding algorithm")]
     MissingPaddingAlgorithm,
 
+    #[error("Crypto Internal Error: {0}")]
+    CryptoInternalError(String),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Error: {0}")]
+    Other(#[from]  tauri::Error),
 }

@@ -1,37 +1,43 @@
 <script lang="ts">
-	import type { LocalFile } from '$lib/components/ui/file-explorer/utils';
+	import type { LocalFile, ProgressFile } from '$lib/components/ui/file-explorer/utils';
 	import { sizeToString, typeToIcon } from '$lib/components/ui/file-explorer/utils';
 	import { writable } from 'svelte/store';
-	import { ArrowDown, ArrowUp, RotateCwIcon, type IconProps } from '@lucide/svelte';
+	import { ArrowDown, ArrowUp, RotateCwIcon, XIcon, type IconProps } from '@lucide/svelte';
 	import type { Component } from 'svelte';
 
 	let {
 		"class": className,
 		files = [],
+		processingFiles,
 		pwd = $bindable(''),
 		label,
 		locked = $bindable(false),
 		lockIcon : LockIcon,
 		unlockIcon : UnlockIcon,
+		constFilter,
 
 		onGoBack,
 		onChangeDir,
 		onFileAction,
+		onStopProcessingFile,
 		onSetAbsolutePath,
 		onLockChange,
 		onRefresh,
 	} : {
 		"class": string;
 		files: LocalFile[];
+		processingFiles: ProgressFile[];
 		pwd: string;
 		label: string;
 		locked: boolean;
 		lockIcon: Component<IconProps, {}>;
 		unlockIcon: Component<IconProps, {}>;
+		constFilter?: RegExp;
 
 		onGoBack: () => Promise<boolean>;
 		onChangeDir: (newDir: string) => Promise<boolean>;
-		onFileAction: (...filename: string[]) => void;
+		onFileAction: (filename: string) => void;
+		onStopProcessingFile: (filename: string) => void;
 		onSetAbsolutePath: (path: string) => Promise<boolean>;
 		onLockChange: (value: boolean) => boolean;
 		onRefresh: () => void;
@@ -60,8 +66,7 @@
 		{ title: "Type", sortKey: "type" },
 	];
 
-	let selectedIndexStart = $state(-1);
-	let selectedIndexEnd = $state(-1);
+	let selectedIndex = $state(-1);
 	let rowEls = $state<{ [key: number]: HTMLDivElement | null }>({});
 
 	const filesWithBack = $derived.by(() => {
@@ -74,6 +79,9 @@
 
 			return res * ($sortDirection === 'asc' ? 1 : -1);
 		}).filter(file => {
+			if (constFilter && file.fileType !== "folder") {
+				return constFilter.test(file.filename) && searchFilter.test(file.filename);
+			}
 			return searchFilter.test(file.filename);
 		});
 		
@@ -101,7 +109,7 @@
 
 		if (await onGoBack()) {
 			clearSearch();
-			selectedIndexEnd = selectedIndexStart = indexStack.pop() ?? -1;
+			selectedIndex = indexStack.pop() ?? -1;
 		}
 	};
 
@@ -111,7 +119,7 @@
 		if (await onChangeDir(newDir)) {
 			clearSearch();
 			indexStack.push(index);
-			selectedIndexEnd = selectedIndexStart = -1;
+			selectedIndex = -1;
 		}
 	};
 
@@ -126,45 +134,30 @@
 	const handleKeyDown = (e: KeyboardEvent) => {
 		e.preventDefault();
 		if (e.key === 'ArrowUp') {
-			selectedIndexEnd = selectedIndexEnd-1;
-			if (!e.shiftKey) {
-				selectedIndexStart = selectedIndexEnd;
-			}
+			selectedIndex--;
 		} else if (e.key === 'ArrowDown') {
-			selectedIndexEnd = selectedIndexEnd+1;
-			if (!e.shiftKey) {
-				selectedIndexStart = selectedIndexEnd;
-			}
+			selectedIndex++;
 		} else if (e.key === 'ArrowLeft') {
 			handleGoBack();
 		} else if (e.key === 'ArrowRight') {
-			const selectedFiles = filesWithBack.slice(selectedIndexStart, selectedIndexEnd + 1);
-			if (selectedFiles.length === 1 && selectedFiles[0].fileType === "folder") {
-				handleChangeDir(selectedFiles[0].filename, selectedIndexEnd);
+			const selectedFile = filesWithBack[selectedIndex];
+			if (selectedFile.fileType === "folder") {
+				handleChangeDir(selectedFile.filename, selectedIndex);
 				return;
 			}
-			if (selectedFiles.some(f => f.fileType === "folder")) {
-				// TODO: error
-				return;
-			}
-			onFileAction(...selectedFiles.map(f => f.filename));
+			onFileAction(selectedFile.filename);
 		} else if (e.key === '/') {
 			searchBar.focus();
 		} else if (e.key === '?') {
 			pwdBar.focus();
 		}
-		selectedIndexStart = Math.min(Math.max(selectedIndexStart, 1), filesWithBack.length-1);
-		selectedIndexEnd = Math.min(Math.max(selectedIndexEnd, 1), filesWithBack.length-1);
+		selectedIndex = Math.min(Math.max(selectedIndex, 1), filesWithBack.length-1);
 	};
 
 	const handleItemClick = (fileIndex: number, e: MouseEvent) => {
 		if (fileIndex === 0) return;
 
-		if (e.shiftKey) {
-			selectedIndexEnd = fileIndex;
-		} else {
-			selectedIndexStart = selectedIndexEnd = fileIndex;
-		}
+		selectedIndex = fileIndex;
 	};
 
 	const handleItemDoubleClick = (file: LocalFile, index: number) => {
@@ -200,7 +193,7 @@
 		escapeItemsMenu(e);
 
 		if (e.key === 'Enter') {
-			selectedIndexStart = selectedIndexEnd = -1;
+			selectedIndex = -1;
 			searchFilter = new RegExp($searchText);
 		}
 	};
@@ -218,7 +211,7 @@
 	};
 
 	$effect(() => {
-		const i = selectedIndexEnd;
+		const i = selectedIndex;
 		if (i < 0) return;
 
 		const row = rowEls[i === 1 ? 0 : i];
@@ -278,11 +271,53 @@
 			{/each}
 		</div>
 		<div class="flex-1 min-h-0 overflow-y-auto">
+			{#each processingFiles as file, fileIndex}
+				<div
+					bind:this={rowEls[fileIndex]}
+					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm box-border outline-none bg-primary/10 hover:bg-primary/15 relative`}
+					role="button"
+					onkeydown={() => {}}
+					tabindex="-1"
+				>
+					<div class="py-2 pl-2">
+						<img
+							src={typeToIcon("")}
+							class="h-6"
+							alt="file-icon"
+						/>
+					</div>
+
+					<div class="px-2 py-2 truncate">
+						{file.filename}
+					</div>
+
+					<div class="px-4 py-2 truncate w-full">
+						<div class="w-full border border-fg-0/20 h-6 rounded-md overflow-hidden">
+							<div 
+								class="h-full bg-success"
+								style="width: {(100 * file.done / file.total) || 0}%"
+							></div>
+						</div>
+					</div>
+
+					<div class="px-4 py-2 text-left">
+						{file.size ? sizeToString(file.size) : ""}
+					</div>
+
+					<div class="px-4 py-2 truncate">Encrypted File</div>
+					<button
+						class="absolute right-5 text-error cursor-pointer hover:bg-error/30 rounded-full p-1"
+						onclick={() => onStopProcessingFile(file.filename)}
+					>
+						<XIcon />
+					</button>
+				</div>
+			{/each}
 			{#each filesWithBack as file, fileIndex}
 				<div
 					bind:this={rowEls[fileIndex]}
 					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm box-border outline-none
-					${fileIndex >= Math.min(selectedIndexStart, selectedIndexEnd) && fileIndex <= Math.max(selectedIndexStart, selectedIndexEnd)
+					${fileIndex == selectedIndex
 						? `shadow-[inset_0_0_0_1px] ${locked ? "shadow-fg-5 bg-fg-5/20" : "shadow-primary bg-primary/20"}`
 						: "hover:bg-bg-2/50"}`}
 					role="button"

@@ -19,6 +19,7 @@
 
     let operation = $state<'dec'|'enc'>('enc');
     let key = $state<Key|null>(null);
+    let cachedKeys = $state<{ [algoMode: string] : Key}>({});
 
     let destLocked = $state(false);
     let sourceWatch = $state(false);
@@ -28,7 +29,8 @@
     ];
 
     const blockCiphers : CipherTag[] = [
-        { value: "block:xtea", label: "XTEA" }
+        { value: "block:xtea", label: "XTEA" },
+        { value: "block:aes256", label: "AES-256" }
     ];
 
     const blockModes : CipherTag[] = [
@@ -96,6 +98,24 @@
         }
     };
 
+    const onKeySet = (newKey: Key) => {
+        cachedKeys[algoStr + ":" + modeStr] = newKey;
+    };
+
+    const onAlgoSelect = (newAlgo: string) => {
+        if (cachedKeys[newAlgo + ":" + modeStr])
+            key = cachedKeys[newAlgo + ":" + modeStr];
+        else
+            key = null;
+    };
+
+    const onModeSelect = (newMode: string) => {
+        if (cachedKeys[algo + ":" + newMode])
+            key = cachedKeys[algo + ":" + newMode];
+        else
+            key = null;
+    };
+
     onMount(() => {
         loadFiles(true);
         loadFiles(false);
@@ -104,7 +124,7 @@
 
 <div class="flex flex-wrap items-center px-5 py-1">
     <p class="mr-3">Choose algorithm:</p>
-    <Select.Root type="single" bind:value={algoStr}>
+    <Select.Root type="single" bind:value={algoStr} onValueChange={onAlgoSelect} disabled={operation === 'dec'}>
         <Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
             {triggerContent}
         </Select.Trigger>
@@ -139,7 +159,7 @@
     </Select.Root>
     {#if algoStr.startsWith("block:")}
         <p class="mx-3">Choose mode:</p>
-        <Select.Root type="single" bind:value={modeStr}>
+        <Select.Root type="single" bind:value={modeStr} onValueChange={onModeSelect} disabled={operation === 'dec'}>
             <Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
                 {triggerContentMode}
             </Select.Trigger>
@@ -161,7 +181,7 @@
     {/if}
     <p class="ml-auto">Key:</p>
     <p class="mx-2 {key !== null ? "text-primary font-black" : "text-fg-4"}">{key?.label ?? "No key selected"}</p>
-    <KeyDialog algo={algo} mode={mode} bind:outputKey={key} />
+    <KeyDialog algo={algo} mode={mode} bind:outputKey={key} onKeySet={onKeySet} operation={operation} />
     <p class="mr-2">Operation:</p>
     <div class="flex border border-bg-4 p-1 rounded-sm gap-2">
         <button 
@@ -190,9 +210,12 @@
             onGoBack={async () => await goDirBack(true) }
             onChangeDir={async dir => await changeDir(dir, true)}
             onFileAction={() => {}}
+            onStopProcessingFile={() => {}}
             onSetAbsolutePath={async newDir => await setAbsolutePath(newDir, true)}
             onLockChange={() => true}
             onRefresh={() => loadFiles(true)}
+            constFilter={operation === 'dec' ? /^.*\.enc$/ : undefined}
+            processingFiles={[]}
         />
     </div>
     <div class="flex-1 p-4 min-h-0 overflow-hidden">
@@ -207,9 +230,14 @@
             onGoBack={() => goDirBack(false) }
             onChangeDir={dir => changeDir(dir, false)}
             onFileAction={() => {}}
+            onStopProcessingFile={() => {}}
             onSetAbsolutePath={async newDir => await setAbsolutePath(newDir, false)}
             onLockChange={() => true}
             onRefresh={() => loadFiles(false)}
+            constFilter={operation === 'enc' ? /^.*\.enc$/ : undefined}
+            processingFiles={[
+                { filename: "test.enc", done: 10, total: 40, size: 500 }
+            ]}
         />
     </div>
 </div>

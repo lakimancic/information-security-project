@@ -3,6 +3,7 @@ pub mod crypto;
 mod key_manager;
 
 use std::sync::Mutex;
+use crate::crypto::api::jobs::JobRegistry;
 use crate::files::commands::{get_files, change_dir, go_dir_back, set_current_dir};
 use crate::key_manager::commands::{list_keys, find_keys_by_algo, generate_new_key, find_key};
 use crate::files::file_explorer::FileExplorer;
@@ -18,6 +19,7 @@ struct AppState {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(JobRegistry::default())
         .manage(AppState {
             source_explorer: Mutex::new(FileExplorer::new()),
             dest_explorer: Mutex::new(FileExplorer::new()),

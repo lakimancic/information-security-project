@@ -118,6 +118,9 @@ impl FileExplorer {
             Some("exe") | Some("msi") | Some("sh") | Some("bat") => {
                 (Some("exe".into()), Some("Executable".into()))
             }
+            Some("enc") => {
+                (Some("enc".into()), Some("Encrypted File".into()))
+            }
             _ => (None, Some("Unknown".into())),
         }
     }

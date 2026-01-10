@@ -11,6 +11,7 @@ mod cipher_factory;
 pub(crate) mod hash;
 pub(crate) mod encryptor;
 pub(crate) mod padding;
+pub mod api;
 
 pub enum CipherInstance {
     Stream(Box<dyn StreamCipher>),
@@ -21,7 +22,7 @@ pub enum CipherInstance {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct CryptoRequest {
     pub algorithm: String,
     pub padding: Option<String>,

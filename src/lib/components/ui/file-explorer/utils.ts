@@ -4,7 +4,14 @@ interface LocalFile {
 	lastModified: string;
 	fileType?: string;
 	typeLong?: string;
-}
+};
+
+interface ProgressFile {
+	filename: string;
+	done: number;
+	total: number;
+	size?: number;
+};
 
 import ImageIcon from './icons/img_icon.png';
 import TextIcon from './icons/text_icon.png';
@@ -53,4 +60,4 @@ export function sizeToString(size: number) {
 	return `${tmpSize} GB`;
 }
 
-export type { LocalFile };
+export type { LocalFile, ProgressFile };

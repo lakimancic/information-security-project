@@ -8,16 +8,22 @@
     let {
         algo,
         mode,
-        outputKey = $bindable(null)
+        operation,
+        outputKey = $bindable(null),
+        onKeySet,
     } : {
         algo: CipherTag|null,
         mode: CipherTag|null,
+        operation: 'dec'|'enc',
         outputKey: Key|null,
+        onKeySet: (key: Key) => void;
     } = $props();
 
     let keyNames = $state<string[]>([]);
 
     let selectedKey = $state(outputKey?.label ?? '');
+    let selectedPass = $state('');
+
     let errorMsg = $state('');
     let dialogOpen = $state(false);
 
@@ -36,6 +42,7 @@
             genName = '';
             genPass = '';
             selectedKey = outputKey?.label ?? '';
+            selectedPass = '';
 
             invoke("find_keys_by_algo", { algorithm: algo?.value ?? '', mode: algo?.value })
                 .then(res => {
@@ -55,11 +62,30 @@
                     ...res,
                     label: genName,
                 };
-                console.log(outputKey);
                 dialogOpen = false;
+                if (outputKey) {
+                    onKeySet(outputKey);
+                }
             })
             .catch((err: any) => {
-                console.error(err);
+                errorMsg = err.message;
+            });
+    };
+
+    const handleChangeKey = async () => {
+        invoke("find_key", { name: selectedKey, password: selectedPass })
+            .then((res: any) => {
+                outputKey = {
+                    ...res,
+                    label: selectedKey,
+                };
+                dialogOpen = false;
+                if (outputKey) {
+                    onKeySet(outputKey);
+                }
+            })
+            .catch((err: any) => {
+                errorMsg = err.message;
             });
     };
 </script>
@@ -69,8 +95,8 @@
     onOpenChange={value => handleDialogOpen(value)}
 >
     <Dialog.Trigger 
-        disabled={algo === null || (algo.value.startsWith("block") && mode === null)}
-        class={algo === null || (algo.value.startsWith("block") && mode === null) ? "text-fg-3/40" : "text-primary"}
+        disabled={algo === null || (algo.value.startsWith("block") && mode === null) || operation === 'dec'}
+        class={algo === null || (algo.value.startsWith("block") && mode === null) || operation === 'dec' ? "text-fg-3/40" : "text-primary"}
     >
         <KeySquareIcon class="bg-bg-3 hover:bg-bg-4 rounded-md p-2 size-10 mr-5 cursor-pointer" />
     </Dialog.Trigger>
@@ -138,12 +164,14 @@
                         id="keyPassword"
                         placeholder="key_password"
                         class="outline-none border border-bg-5 min-w-40 text-md py-2 px-3 rounded-md w-full mt-2 mb-4 placeholder:text-fg-0/40"
+                        bind:value={selectedPass}
                     />
                     <p class="text-center text-error">{errorMsg}</p>
                     <div class="flex w-full justify-end mt-5">
-                        <Dialog.Close
+                        <button
+                            onclick={handleChangeKey}
                             class="bg-primary px-4 py-3 font-semibold rounded-md cursor-pointer hover:bg-primary/70 transition-colors duration-300"
-                        >Select Key</Dialog.Close>
+                        >Select Key</button>
                     </div>
                 </Tabs.Content>
                 <Tabs.Content value="generate-new" class="py-3">
