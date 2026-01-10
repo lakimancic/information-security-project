@@ -13,17 +13,17 @@ use crate::crypto::padding::pkcs7::Pkcs7;
 use crate::key_manager::errors::KeysError;
 use crate::key_manager::key::{EncryptedKey, PlainKey};
 
-#[derive(Debug)]
 pub struct KeyManager {
     keys: HashMap<String, EncryptedKey>,
+    path: PathBuf,
 }
 
 impl KeyManager {
     pub fn new() -> Self {
-        Self { keys: HashMap::new() }
+        Self { keys: HashMap::new(), path: std::env::current_dir().unwrap().join("data.keys") }
     }
 
-    pub fn generate_new(&mut self, key_name: String, password: String, key_size: usize, iv_size: usize) -> Result<(), KeysError> {
+    pub fn generate_new(&mut self, key_name: String, password: String, key_size: usize, iv_size: usize) -> Result<PlainKey, KeysError> {
         if self.keys.contains_key(&key_name) {
             return Err(KeysError::KeyAlreadyExists(key_name));
         }
@@ -34,7 +34,16 @@ impl KeyManager {
         let hash = hasher.finalize()?;
 
         let mut rng = rand::rng();
-        let mut message = (0..key_size + iv_size).map(|_| { rng.random::<u8>()}).collect::<Vec<u8>>();
+        let key = (0..key_size).map(|_| { rng.random::<u8>()}).collect::<Vec<u8>>();
+        let iv = if iv_size > 0 {
+            Some((0..iv_size).map(|_| { rng.random::<u8>()}).collect::<Vec<u8>>())
+        } else {
+            None
+        };
+        let mut message = key.clone();
+        if let Some(iv_vec) = &iv {
+            message.extend_from_slice(iv_vec);
+        }
         message.extend_from_slice(hash.as_ref());
 
         let mut cipher = Encryptor::from_instance(CipherInstance::Block {
@@ -55,7 +64,7 @@ impl KeyManager {
             ciphertext
         });
 
-        Ok(())
+        Ok(PlainKey { key, iv })
     }
 
     pub fn find_key(&self, name: String, password: String) -> Result<PlainKey, KeysError> {
@@ -97,8 +106,32 @@ impl KeyManager {
         Ok(PlainKey { key, iv })
     }
 
-    pub fn save_to_disk(&self, path: &PathBuf) -> Result<(), KeysError> {
-        let file = File::create(path)?;
+    pub fn list_keys(&self) -> Result<Vec<String>, KeysError> {
+        Ok(self.keys.keys().cloned().collect())
+    }
+
+    pub fn find_keys_by_size(&self, key_size: usize, iv_size: usize) -> Result<Vec<String>, KeysError> {
+        Ok(
+            self.keys
+                .iter()
+                .filter(|(_, key)| key.key_size == key_size && key.iv_size == iv_size)
+                .map(|(key_name, _)| key_name)
+                .cloned()
+                .collect()
+        )
+    }
+
+    pub fn delete_key(&mut self, key: String) -> Result<(), KeysError> {
+        if self.keys.remove(&key).is_some() {
+            Ok(())
+        }
+        else {
+            Err(KeysError::KeyNotFound(key))
+        }
+    }
+
+    pub fn save_to_disk(&self) -> Result<(), KeysError> {
+        let file = File::create(&self.path)?;
         let mut writer = BufWriter::new(file);
 
         writer.write(b"KOXKM\xde\xad")?;
@@ -118,8 +151,8 @@ impl KeyManager {
         Ok(())
     }
 
-    pub fn load_from_disk(&mut self, path: &PathBuf) -> Result<(), KeysError> {
-        let file = File::open(path)?;
+    pub fn load_from_disk(&mut self) -> Result<(), KeysError> {
+        let file = File::open(&self.path)?;
         let mut reader = BufReader::new(file);
 
         let mut magic = [0u8; 7];

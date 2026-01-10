@@ -1,7 +1,7 @@
 interface Key {
     label: string;
-    keyHex: string;
-    ivHex?: string;
+    key: number[];
+    iv?: number[];
 }
 
 interface CipherTag {

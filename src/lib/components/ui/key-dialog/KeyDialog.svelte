@@ -3,6 +3,7 @@
 	import { Dialog, Separator, Tabs } from "bits-ui";
     import * as Select from "$lib/components/ui/select/index";
 	import type { CipherTag, Key } from "$lib/types/crypto";
+    import { invoke } from '@tauri-apps/api/core';
 
     let {
         algo,
@@ -14,21 +15,59 @@
         outputKey: Key|null,
     } = $props();
 
-    const keyNames = [
-        'hello world',
-        'world hello',
-        'alpha key',
-    ];
+    let keyNames = $state<string[]>([]);
 
     let selectedKey = $state(outputKey?.label ?? '');
     let errorMsg = $state('');
+    let dialogOpen = $state(false);
+
+    let genName = $state('');
+    let genPass = $state('');
+
+    let currentTab = $state("select-existing");
 
     const triggerContentKey = $derived(
         keyNames.find(m => m === selectedKey) ?? "encryption_key_name"
     );
+
+    const handleDialogOpen = async (value: boolean) => {
+        if (value) {
+            errorMsg = '';
+            genName = '';
+            genPass = '';
+            selectedKey = outputKey?.label ?? '';
+
+            invoke("find_keys_by_algo", { algorithm: algo?.value ?? '', mode: algo?.value })
+                .then(res => {
+                    keyNames = res as string[];
+                    dialogOpen = value;
+                });
+        }
+        else {
+            dialogOpen = value;
+        }
+    };
+
+    const handleGenerateKey = async () => {
+        invoke("generate_new_key", { algorithm: algo?.value ?? '', mode: algo?.value, name: genName, password: genPass })
+            .then((res: any) => {
+                outputKey = {
+                    ...res,
+                    label: genName,
+                };
+                console.log(outputKey);
+                dialogOpen = false;
+            })
+            .catch((err: any) => {
+                console.error(err);
+            });
+    };
 </script>
 
-<Dialog.Root>
+<Dialog.Root
+    bind:open={dialogOpen}
+    onOpenChange={value => handleDialogOpen(value)}
+>
     <Dialog.Trigger 
         disabled={algo === null || (algo.value.startsWith("block") && mode === null)}
         class={algo === null || (algo.value.startsWith("block") && mode === null) ? "text-fg-3/40" : "text-primary"}
@@ -58,7 +97,7 @@
             {/if}
             </div>
             <Tabs.Root
-                value="select-existing"
+                bind:value={currentTab}
                 class="mt-4"
             >
                 <Tabs.List
@@ -115,6 +154,7 @@
                         id="keyName"
                         placeholder="key_name"
                         class="outline-none border border-bg-5 min-w-40 text-md py-2 px-3 rounded-md w-full mt-2 mb-4 placeholder:text-fg-0/40"
+                        bind:value={genName}
                     />
                     <p>Enter key password:</p>
                     <input 
@@ -123,6 +163,7 @@
                         id="keyPassword"
                         placeholder="key_password"
                         class="outline-none border border-bg-5 min-w-40 text-md py-2 px-3 rounded-md w-full mt-2 mb-4 placeholder:text-fg-0/40"
+                        bind:value={genPass}
                     />
                     <p>Confirm key password:</p>
                     <input 
@@ -134,9 +175,10 @@
                     />
                     <p class="text-center text-error">{errorMsg}</p>
                     <div class="flex w-full justify-end mt-5">
-                        <Dialog.Close
+                        <button
                             class="bg-primary px-4 py-3 font-semibold rounded-md cursor-pointer hover:bg-primary/70 transition-colors duration-300"
-                        >Generate Key</Dialog.Close>
+                            onclick={handleGenerateKey}
+                        >Generate Key</button>
                     </div>
                 </Tabs.Content>
             </Tabs.Root>
