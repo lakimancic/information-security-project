@@ -8,7 +8,7 @@ interface LocalFile {
 
 interface ProgressFile {
 	filename: string;
-	done: number;
+	processed: number;
 	total: number;
 	size?: number;
 };

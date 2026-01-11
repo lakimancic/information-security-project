@@ -8,6 +8,8 @@ pub struct Encryptor {
     cipher: CipherInstance
 }
 
+const BUFFER_SIZE: usize = 1024 * 1024;
+
 impl Encryptor {
     pub fn new(req: CryptoRequest) -> Result<Self, CryptoError> {
         Ok(Self {
@@ -27,7 +29,7 @@ impl Encryptor {
         W: Write
     {
         if let CipherInstance::Stream(ref mut stream_cipher) = self.cipher {
-            let mut buffer = vec![0u8; 4096];
+            let mut buffer = vec![0u8; BUFFER_SIZE];
 
             stream_cipher.reset()?;
             loop {
@@ -43,7 +45,7 @@ impl Encryptor {
         }
         else if let CipherInstance::Block { ref cipher, ref mut mode, ref padding } = self.cipher {
             let bs = cipher.block_size();
-            let chunk_size = (4096 / bs) * bs;
+            let chunk_size = (BUFFER_SIZE / bs) * bs;
 
             let mut buffer = vec![0u8; chunk_size];
             let mut leftover = Vec::<u8>::new();
@@ -94,7 +96,7 @@ impl Encryptor {
         W: Write,
     {
         if let CipherInstance::Stream(ref mut stream_cipher) = self.cipher {
-            let mut buffer = vec![0u8; 4096];
+            let mut buffer = vec![0u8; BUFFER_SIZE];
 
             stream_cipher.reset()?;
             loop {
@@ -110,7 +112,7 @@ impl Encryptor {
         }
         else if let CipherInstance::Block { ref cipher, ref mut mode, ref padding } = self.cipher {
             let bs = cipher.block_size();
-            let chunk_size = (4096 / bs) * bs;
+            let chunk_size = (BUFFER_SIZE / bs) * bs;
 
             let mut buffer = vec![0u8; chunk_size];
             let mut leftover = Vec::<u8>::new();

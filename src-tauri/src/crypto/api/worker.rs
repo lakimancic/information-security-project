@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use tauri::Emitter;
-use crate::crypto::api::progress::ProgressWriter;
+use crate::crypto::api::progress::{CryptoProgress, ProgressWriter};
 use crate::crypto::CryptoRequest;
 use crate::crypto::encryptor::Encryptor;
 use crate::crypto::errors::CryptoError;
@@ -16,24 +16,54 @@ pub fn encrypt_worker(
 ) -> Result<(), CryptoError> {
     use std::fs::File;
 
-    let input = File::open(input_file)?;
-    let output = File::create(output_file)?;
+    let tmp_file_path = output_file.with_extension(format!(
+        "{}.tmp",
+        output_file.extension().and_then(|s| s.to_str()).unwrap_or("tmp")
+    ));
+
+    let input = File::open(&input_file)?;
+    let tmp_output = File::create(&tmp_file_path)?;
     let total = input.metadata()?.len() as usize;
 
-    app.emit("crypto:start", output_file.file_name())?;
+    let output_str = output_file.file_name().unwrap_or_default().to_str().unwrap_or("").to_string();
 
-    let writer = ProgressWriter {
-        inner: output,
+    app.emit("crypto:start", CryptoProgress {
+        filename: output_str.clone(),
         processed: 0,
         total,
-        filename: output_file.to_str().unwrap_or_default().to_string(),
+    })?;
+
+    let writer = ProgressWriter {
+        inner: tmp_output,
+        processed: 0,
+        total,
+        filename: output_str.clone(),
         app: app.clone(),
-        cancel,
+        cancel: cancel.clone(),
     };
 
     let mut encryptor = Encryptor::new(request.clone())?;
-    encryptor.encrypt(input, writer)?;
 
-    app.emit("crypto:done", output_file.file_name())?;
+    if let Err(e) = encryptor.encrypt(input, writer) {
+        let _ = std::fs::remove_file(&tmp_file_path)?;
+        return Err(e.into());
+    }
+
+    if cancel.load(std::sync::atomic::Ordering::SeqCst) {
+        let _ = std::fs::remove_file(&tmp_file_path)?;
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Interrupted,
+            "Encryption cancelled",
+        ).into());
+    }
+
+    std::fs::rename(&tmp_file_path, &output_file)?;
+
+    app.emit("crypto:done", CryptoProgress {
+        filename: output_str,
+        processed: total,
+        total,
+    })?;
+
     Ok(())
 }

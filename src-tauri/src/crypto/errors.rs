@@ -32,6 +32,9 @@ pub enum CryptoError {
     #[error("Crypto Internal Error: {0}")]
     CryptoInternalError(String),
 
+    #[error("File is not encrypting")]
+    FileIsNotEncrypting,
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
@@ -53,6 +56,7 @@ enum ErrorName {
     InvalidPadding(String),
     MissingPaddingAlgorithm(String),
     CryptoInternalError(String),
+    FileIsNotEncrypting(String),
     Io(String),
     Other(String),
 }
@@ -74,6 +78,7 @@ impl serde::Serialize for CryptoError {
             Self::InvalidPadding => ErrorName::InvalidPadding(message),
             Self::MissingPaddingAlgorithm => ErrorName::MissingPaddingAlgorithm(message),
             Self::CryptoInternalError(_) => ErrorName::CryptoInternalError(message),
+            Self::FileIsNotEncrypting => ErrorName::FileIsNotEncrypting(message),
             Self::Io(_) => ErrorName::Io(message),
             Self::Other(_) => ErrorName::Other(message),
         };

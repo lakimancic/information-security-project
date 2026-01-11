@@ -295,7 +295,7 @@
 						<div class="w-full border border-fg-0/20 h-6 rounded-md overflow-hidden">
 							<div 
 								class="h-full bg-success"
-								style="width: {(100 * file.done / file.total) || 0}%"
+								style="width: {(100 * file.processed / file.total) || 0}%"
 							></div>
 						</div>
 					</div>

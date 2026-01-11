@@ -1,18 +1,22 @@
 <script lang="ts">
 	import FileExplorer from "$lib/components/ui/file-explorer/FileExplorer.svelte";
-	import type { LocalFile } from "$lib/components/ui/file-explorer/utils";
+	import type { LocalFile, ProgressFile } from "$lib/components/ui/file-explorer/utils";
 	import KeyDialog from "$lib/components/ui/key-dialog/KeyDialog.svelte";
 	import * as Select from "$lib/components/ui/select/index";
-	import { type CipherTag, type Key } from "$lib/types/crypto";
-	import { EyeOffIcon, KeySquareIcon, LockIcon, LockOpenIcon, ScanEyeIcon, XIcon } from "@lucide/svelte";
+	import type { CipherTag, Key } from "$lib/types/crypto";
+	import { EyeOffIcon, LockIcon, LockOpenIcon, ScanEyeIcon } from "@lucide/svelte";
     import { invoke } from '@tauri-apps/api/core';
+    import { listen } from "@tauri-apps/api/event";
 	import { onMount } from "svelte";
+    import { SvelteMap } from "svelte/reactivity";
 
     let sourceFiles: LocalFile[] = $state([]);
     let sourceCwd: string = $state('');
 
     let destFiles: LocalFile[] = $state([]);
     let destCwd: string = $state('');
+
+    let processFiles = $state<SvelteMap<string, ProgressFile>>(new SvelteMap());
 
     let algoStr = $state('');
     let modeStr = $state('');
@@ -42,6 +46,10 @@
     });
     let mode = $derived.by(() => {
         return blockModes.find(v => v.value === modeStr) ?? null
+    });
+
+    let processFilesArray = $derived.by(() => {
+        return Array.from(processFiles.values());
     });
 
     const triggerContent = $derived(
@@ -113,6 +121,18 @@
         .then(() => {})
         .catch(err => {
             console.error(err);
+        });
+    };
+
+    const stopFileEncryption = async (filename: string) => {
+        invoke("stop_encryption", { filename: filename.replace(/\.enc$/, '') })
+        .then(() => {
+            if (processFiles.has(filename)) {
+                processFiles.delete(filename);
+            }
+        })
+        .catch(err => {
+            console.error(err);
         })
     };
 
@@ -137,12 +157,46 @@
     onMount(() => {
         loadFiles(true);
         loadFiles(false);
+
+        const unlisteners: Array<() => void> = [];
+
+        const setupListeners = async () => {
+            unlisteners.push(await listen<ProgressFile>("crypto:start", (event) => {
+                if (!processFiles.has(event.payload.filename)) {
+                    processFiles.set(event.payload.filename, {
+                        ...event.payload,
+                        size: event.payload.total
+                    });
+                }
+            }));
+
+            unlisteners.push(await listen<ProgressFile>("crypto:done", (event) => {
+                if (processFiles.has(event.payload.filename)) {
+                    processFiles.delete(event.payload.filename);
+                }
+            }));
+
+            unlisteners.push(await listen<ProgressFile>("crypto:progress", (event) => {
+                if (processFiles.has(event.payload.filename)) {
+                    processFiles.set(event.payload.filename, {
+                        ...event.payload,
+                        size: event.payload.total
+                    });
+                }
+            }));
+        };
+
+        setupListeners();
+
+        return () => {
+            unlisteners.forEach(fn => fn());
+        };
     });
 </script>
 
 <div class="flex flex-wrap items-center px-5 py-1">
     <p class="mr-3">Choose algorithm:</p>
-    <Select.Root type="single" bind:value={algoStr} onValueChange={onAlgoSelect} disabled={operation === 'dec'}>
+    <Select.Root type="single" bind:value={algoStr} onValueChange={onAlgoSelect} disabled={operation === 'dec' || processFiles.size !== 0}>
         <Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
             {triggerContent}
         </Select.Trigger>
@@ -177,7 +231,7 @@
     </Select.Root>
     {#if algoStr.startsWith("block:")}
         <p class="mx-3">Choose mode:</p>
-        <Select.Root type="single" bind:value={modeStr} onValueChange={onModeSelect} disabled={operation === 'dec'}>
+        <Select.Root type="single" bind:value={modeStr} onValueChange={onModeSelect} disabled={operation === 'dec' || processFiles.size !== 0}>
             <Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
                 {triggerContentMode}
             </Select.Trigger>
@@ -248,14 +302,12 @@
             onGoBack={() => goDirBack(false) }
             onChangeDir={dir => changeDir(dir, false)}
             onFileAction={() => {}}
-            onStopProcessingFile={() => {}}
+            onStopProcessingFile={stopFileEncryption}
             onSetAbsolutePath={async newDir => await setAbsolutePath(newDir, false)}
             onLockChange={() => true}
             onRefresh={() => loadFiles(false)}
             constFilter={operation === 'enc' ? /^.*\.enc$/ : undefined}
-            processingFiles={[
-                { filename: "test.enc", done: 10, total: 40, size: 500 }
-            ]}
+            processingFiles={processFilesArray}
         />
     </div>
 </div>
