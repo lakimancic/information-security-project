@@ -109,15 +109,29 @@
     const onFileAction = async (filename: string) => {
         if (!key) return;
 
-        invoke("encrypt_file", { 
-            request: {
-                algorithm: algoStr,
-                mode: mode ? modeStr : undefined,
-                key: key.key,
-                iv: key.iv
-            },
-            file: filename
-        })
+        let invoker;
+        if (operation === 'enc') {
+            invoker = invoke("encrypt_file", { 
+                request: {
+                    algorithm: algoStr,
+                    mode: mode ? modeStr : undefined,
+                    key: key.key,
+                    iv: key.iv
+                },
+                file: filename
+            });
+        }
+        else {
+            invoker = invoke("decrypt_file", { 
+                key: {
+                    key: key.key,
+                    iv: key.iv
+                },
+                file: filename
+            })
+        }
+
+        invoker
         .then(() => {})
         .catch(err => {
             console.error(err);
@@ -125,7 +139,9 @@
     };
 
     const stopFileEncryption = async (filename: string) => {
-        invoke("stop_encryption", { filename: filename.replace(/\.enc$/, '') })
+        const realFilename = operation === 'enc' ?
+            filename.replace(/\.enc$/, '') : `${filename}.enc`;
+        invoke("stop_processing", { filename: realFilename, encrypt: operation === 'enc' })
         .then(() => {
             if (processFiles.has(filename)) {
                 processFiles.delete(filename);
@@ -183,6 +199,10 @@
                         size: event.payload.total
                     });
                 }
+            }));
+
+            unlisteners.push(await listen<ProgressFile>("crypto:error", (event) => {
+                console.error(event.payload);
             }));
         };
 

@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, thiserror::Error)]
@@ -32,8 +33,8 @@ pub enum CryptoError {
     #[error("Crypto Internal Error: {0}")]
     CryptoInternalError(String),
 
-    #[error("File is not encrypting")]
-    FileIsNotEncrypting,
+    #[error("File is not {0}")]
+    FileIsNotProcessing(String),
 
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -59,7 +60,7 @@ enum ErrorName {
     InvalidPadding(String),
     MissingPaddingAlgorithm(String),
     CryptoInternalError(String),
-    FileIsNotEncrypting(String),
+    FileIsNotProcessing(String),
     Io(String),
     Other(String),
     Json(String),
@@ -82,11 +83,17 @@ impl serde::Serialize for CryptoError {
             Self::InvalidPadding => ErrorName::InvalidPadding(message),
             Self::MissingPaddingAlgorithm => ErrorName::MissingPaddingAlgorithm(message),
             Self::CryptoInternalError(_) => ErrorName::CryptoInternalError(message),
-            Self::FileIsNotEncrypting => ErrorName::FileIsNotEncrypting(message),
+            Self::FileIsNotProcessing(_) => ErrorName::FileIsNotProcessing(message),
             Self::Io(_) => ErrorName::Io(message),
             Self::Other(_) => ErrorName::Other(message),
             Self::Json(_) => ErrorName::Json(message),
         };
         name.serialize(serializer)
     }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CryptoErrorEvent {
+    pub(crate) err: String,
+    pub(crate) filename: String,
 }

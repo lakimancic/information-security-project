@@ -105,8 +105,8 @@
     onOpenChange={value => handleDialogOpen(value)}
 >
     <Dialog.Trigger 
-        disabled={algo === null || (algo.value.startsWith("block") && mode === null)}
-        class={algo === null || (algo.value.startsWith("block") && mode === null) ? "text-fg-3/40" : "text-primary"}
+        disabled={(algo === null || (algo.value.startsWith("block") && mode === null)) && operation === 'enc'}
+        class={(algo === null || (algo.value.startsWith("block") && mode === null)) && operation === 'enc' ? "text-fg-3/40" : "text-primary"}
     >
         <KeySquareIcon class="bg-bg-3 hover:bg-bg-4 rounded-md p-2 size-10 mr-5 cursor-pointer" />
     </Dialog.Trigger>
