@@ -40,6 +40,9 @@ pub enum CryptoError {
 
     #[error(transparent)]
     Other(#[from] tauri::Error),
+
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
 }
 
 #[derive(serde::Serialize)]
@@ -59,6 +62,7 @@ enum ErrorName {
     FileIsNotEncrypting(String),
     Io(String),
     Other(String),
+    Json(String),
 }
 
 impl serde::Serialize for CryptoError {
@@ -81,6 +85,7 @@ impl serde::Serialize for CryptoError {
             Self::FileIsNotEncrypting => ErrorName::FileIsNotEncrypting(message),
             Self::Io(_) => ErrorName::Io(message),
             Self::Other(_) => ErrorName::Other(message),
+            Self::Json(_) => ErrorName::Json(message),
         };
         name.serialize(serializer)
     }

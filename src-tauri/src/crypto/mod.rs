@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use crate::crypto::block::BlockCipher;
 use crate::crypto::block::modes::BlockMode;
 use crate::crypto::padding::Padding;
@@ -30,4 +30,15 @@ pub struct CryptoRequest {
     pub mode: Option<String>,
     pub key: Vec<u8>,
     pub iv: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CryptoMetadata {
+    pub filename: String,
+    pub size: usize,
+    pub created: String,
+    pub algorithm: String,
+    pub block_mode: Option<String>,
+    pub hash_algo: Option<String>
 }

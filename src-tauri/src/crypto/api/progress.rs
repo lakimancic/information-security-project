@@ -36,7 +36,7 @@ impl<W: Write> Write for ProgressWriter<W> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         if self.cancel.load(Ordering::Relaxed) {
             return Err(std::io::Error::new(
-                std::io::ErrorKind::Interrupted,
+                std::io::ErrorKind::Other,
                 "Encryption cancelled",
             ));
         }

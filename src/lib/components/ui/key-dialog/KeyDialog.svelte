@@ -43,12 +43,22 @@
             genPass = '';
             selectedKey = outputKey?.label ?? '';
             selectedPass = '';
+            currentTab = "select-existing";
 
-            invoke("find_keys_by_algo", { algorithm: algo?.value ?? '', mode: algo?.value })
+            if (operation === 'enc') {
+                invoke("find_keys_by_algo", { algorithm: algo?.value ?? '', mode: algo?.value })
                 .then(res => {
                     keyNames = res as string[];
                     dialogOpen = value;
                 });
+            }
+            else {
+                invoke("list_keys")
+                .then(res => {
+                    keyNames = res as string[];
+                    dialogOpen = value;
+                });
+            }
         }
         else {
             dialogOpen = value;
@@ -95,8 +105,8 @@
     onOpenChange={value => handleDialogOpen(value)}
 >
     <Dialog.Trigger 
-        disabled={algo === null || (algo.value.startsWith("block") && mode === null) || operation === 'dec'}
-        class={algo === null || (algo.value.startsWith("block") && mode === null) || operation === 'dec' ? "text-fg-3/40" : "text-primary"}
+        disabled={algo === null || (algo.value.startsWith("block") && mode === null)}
+        class={algo === null || (algo.value.startsWith("block") && mode === null) ? "text-fg-3/40" : "text-primary"}
     >
         <KeySquareIcon class="bg-bg-3 hover:bg-bg-4 rounded-md p-2 size-10 mr-5 cursor-pointer" />
     </Dialog.Trigger>
@@ -116,12 +126,14 @@
             <Dialog.Description class="text-fg-3 text-sm">
                 Create and manage your keys for file encryption and decryption. You can create or manage multiple keys to many different ciphers.
             </Dialog.Description>
-            <div class="my-3 text-xl grid grid-cols-2">
-                <p>Algorithm: <span class="text-primary font-black">{algo?.label ?? ''}</span></p>
-            {#if algo?.value.startsWith("block")}
-                <p>Block Mode: <span class="text-primary font-black">{mode?.label ?? ''}</span></p>
+            {#if operation === 'enc'}
+                <div class="my-3 text-xl grid grid-cols-2">
+                    <p>Algorithm: <span class="text-primary font-black">{algo?.label ?? ''}</span></p>
+                {#if algo?.value.startsWith("block")}
+                    <p>Block Mode: <span class="text-primary font-black">{mode?.label ?? ''}</span></p>
+                {/if}
+                </div>
             {/if}
-            </div>
             <Tabs.Root
                 bind:value={currentTab}
                 class="mt-4"
@@ -135,7 +147,8 @@
                     >Select Existing</Tabs.Trigger>
                     <Tabs.Trigger 
                         value="generate-new"
-                        class="data-[state=active]:bg-bg-0 rounded-md"
+                        class="data-[state=active]:bg-bg-0 disabled:text-fg-1/50 rounded-md"
+                        disabled={operation === 'dec'}
                     >Generate New</Tabs.Trigger>
                 </Tabs.List>
                 <Tabs.Content value="select-existing" class="py-3">

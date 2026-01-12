@@ -1,9 +1,11 @@
+use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use chrono::{DateTime, Utc};
 use tauri::Emitter;
 use crate::crypto::api::progress::{CryptoProgress, ProgressWriter};
-use crate::crypto::CryptoRequest;
+use crate::crypto::{CryptoMetadata, CryptoRequest};
 use crate::crypto::encryptor::Encryptor;
 use crate::crypto::errors::CryptoError;
 
@@ -22,10 +24,28 @@ pub fn encrypt_worker(
     ));
 
     let input = File::open(&input_file)?;
-    let tmp_output = File::create(&tmp_file_path)?;
+    let mut tmp_output = File::create(&tmp_file_path)?;
     let total = input.metadata()?.len() as usize;
 
     let output_str = output_file.file_name().unwrap_or_default().to_str().unwrap_or("").to_string();
+    let input_str = input_file.file_stem().unwrap_or_default().to_str().unwrap_or("").to_string();
+
+    let datetime: DateTime<Utc> = Utc::now();
+
+    let metadata = CryptoMetadata{
+        filename: input_str,
+        size: total,
+        created: datetime.to_string(),
+        algorithm: request.algorithm.clone(),
+        block_mode: request.mode.clone(),
+        hash_algo: None,
+    };
+
+    let metadata_str = serde_json::to_string(&metadata)?;
+    let mut metadata_bytes = metadata_str.as_bytes().to_vec();
+    metadata_bytes.push(0);
+
+    tmp_output.write_all(&metadata_bytes)?;
 
     app.emit("crypto:start", CryptoProgress {
         filename: output_str.clone(),
@@ -33,18 +53,21 @@ pub fn encrypt_worker(
         total,
     })?;
 
-    let writer = ProgressWriter {
-        inner: tmp_output,
-        processed: 0,
-        total,
-        filename: output_str.clone(),
-        app: app.clone(),
-        cancel: cancel.clone(),
+    let result = {
+        let writer = ProgressWriter {
+            inner: tmp_output,
+            processed: 0,
+            total,
+            filename: output_str.clone(),
+            app: app.clone(),
+            cancel: cancel.clone()
+        };
+
+        let mut encryptor = Encryptor::new(request.clone())?;
+        encryptor.encrypt(input, writer)
     };
 
-    let mut encryptor = Encryptor::new(request.clone())?;
-
-    if let Err(e) = encryptor.encrypt(input, writer) {
+    if let Err(e) = result {
         let _ = std::fs::remove_file(&tmp_file_path)?;
         return Err(e.into());
     }
