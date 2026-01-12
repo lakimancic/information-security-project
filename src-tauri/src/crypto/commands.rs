@@ -13,7 +13,17 @@ pub async fn encrypt_file(
     file: String,
 ) -> Result<(), CryptoError> {
     let jobs = state.jobs.clone();
-    try_start_encrypt(state, app, jobs, file, request)
+
+    let source_explorer = state.source_explorer.lock()
+        .map_err(|err| CryptoError::CryptoInternalError(err.to_string()))?;
+
+    let destination_explorer = state.dest_explorer.lock()
+        .map_err(|err| CryptoError::CryptoInternalError(err.to_string()))?;
+
+    let source_path = source_explorer.get_current_path_buf();
+    let destination_path = destination_explorer.get_current_path_buf();
+
+    try_start_encrypt(app, jobs, source_path, destination_path, file, request)
 }
 
 #[tauri::command]
@@ -24,7 +34,17 @@ pub async fn decrypt_file(
     file: String,
 ) -> Result<(), CryptoError> {
     let jobs = state.jobs.clone();
-    try_start_decrypt(state, app, jobs, file, key)
+
+    let source_explorer = state.source_explorer.lock()
+        .map_err(|err| CryptoError::CryptoInternalError(err.to_string()))?;
+
+    let destination_explorer = state.dest_explorer.lock()
+        .map_err(|err| CryptoError::CryptoInternalError(err.to_string()))?;
+
+    let source_path = source_explorer.get_current_path_buf();
+    let destination_path = destination_explorer.get_current_path_buf();
+
+    try_start_decrypt(app, jobs, source_path, destination_path, file, key)
 }
 
 #[tauri::command]

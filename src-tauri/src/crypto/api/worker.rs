@@ -10,6 +10,65 @@ use crate::crypto::encryptor::Encryptor;
 use crate::crypto::errors::CryptoError;
 use crate::key_manager::key::PlainKey;
 
+fn run_crypto_job<F>(
+    app: tauri::AppHandle,
+    output_file: &Path,
+    total: usize,
+    filename: String,
+    cancel: Arc<AtomicBool>,
+    run: F,
+) -> Result<(), CryptoError>
+where
+    F: FnOnce(ProgressWriter<std::fs::File>) -> Result<(), CryptoError>,
+{
+    let tmp_file_path = output_file.with_extension(format!(
+        "{}.tmp",
+        output_file
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("tmp")
+    ));
+
+    let tmp_output = std::fs::File::create(&tmp_file_path)?;
+
+    let result = {
+        let writer = ProgressWriter {
+            inner: tmp_output,
+            processed: 0,
+            total,
+            filename: filename.clone(),
+            app: app.clone(),
+            cancel: cancel.clone(),
+        };
+
+        run(writer)
+    };
+
+    if let Err(e) = result {
+        let _ = std::fs::remove_file(&tmp_file_path);
+        return Err(e);
+    }
+
+    if cancel.load(std::sync::atomic::Ordering::SeqCst) {
+        let _ = std::fs::remove_file(&tmp_file_path);
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Interrupted,
+            "Encryption cancelled",
+        )
+            .into());
+    }
+
+    std::fs::rename(&tmp_file_path, output_file)?;
+
+    app.emit("crypto:done", CryptoProgress {
+        filename,
+        processed: total,
+        total,
+    })?;
+
+    Ok(())
+}
+
 pub fn encrypt_worker(
     app: tauri::AppHandle,
     input_file: &Path,
@@ -19,34 +78,35 @@ pub fn encrypt_worker(
 ) -> Result<(), CryptoError> {
     use std::fs::File;
 
-    let tmp_file_path = output_file.with_extension(format!(
-        "{}.tmp",
-        output_file.extension().and_then(|s| s.to_str()).unwrap_or("tmp")
-    ));
-
-    let input = File::open(&input_file)?;
-    let mut tmp_output = File::create(&tmp_file_path)?;
+    let input = File::open(input_file)?;
     let total = input.metadata()?.len() as usize;
 
-    let output_str = output_file.file_name().unwrap_or_default().to_str().unwrap_or("").to_string();
-    let input_str = input_file.file_stem().unwrap_or_default().to_str().unwrap_or("").to_string();
+    let output_str = output_file
+        .file_name()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or("")
+        .to_string();
 
-    let datetime: DateTime<Utc> = Utc::now();
+    let input_str = input_file
+        .file_stem()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or("")
+        .to_string();
 
-    let metadata = CryptoMetadata{
+    let metadata = CryptoMetadata {
         filename: input_str,
         size: total,
-        created: datetime.to_string(),
+        created: Utc::now().to_string(),
         algorithm: request.algorithm.clone(),
         block_mode: request.mode.clone(),
         hash_algo: None,
+        padding: request.padding.clone(),
     };
 
-    let metadata_str = serde_json::to_string(&metadata)?;
-    let mut metadata_bytes = metadata_str.as_bytes().to_vec();
+    let mut metadata_bytes = serde_json::to_vec(&metadata)?;
     metadata_bytes.push(0);
-
-    tmp_output.write_all(&metadata_bytes)?;
 
     app.emit("crypto:start", CryptoProgress {
         filename: output_str.clone(),
@@ -54,62 +114,40 @@ pub fn encrypt_worker(
         total,
     })?;
 
-    let result = {
-        let writer = ProgressWriter {
-            inner: tmp_output,
-            processed: 0,
-            total,
-            filename: output_str.clone(),
-            app: app.clone(),
-            cancel: cancel.clone()
-        };
-
-        let mut encryptor = Encryptor::new(request.clone())?;
-        encryptor.encrypt(input, writer)
-    };
-
-    if let Err(e) = result {
-        let _ = std::fs::remove_file(&tmp_file_path)?;
-        return Err(e.into());
-    }
-
-    if cancel.load(std::sync::atomic::Ordering::SeqCst) {
-        let _ = std::fs::remove_file(&tmp_file_path)?;
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Interrupted,
-            "Encryption cancelled",
-        ).into());
-    }
-
-    std::fs::rename(&tmp_file_path, &output_file)?;
-
-    app.emit("crypto:done", CryptoProgress {
-        filename: output_str,
-        processed: total,
+    run_crypto_job(
+        app,
+        output_file,
         total,
-    })?;
+        output_str,
+        cancel,
+        |writer| {
+            use std::io::Write;
+            let mut writer = writer;
 
-    Ok(())
+            writer.inner.write_all(&metadata_bytes)?;
+
+            let mut encryptor = Encryptor::new(request.clone())?;
+            encryptor.encrypt(input, writer)
+        },
+    )
 }
 
 pub fn decrypt_worker(
     app: tauri::AppHandle,
     input_file: &Path,
     output_file: &Path,
-    request: &PlainKey,
+    key: &PlainKey,
     cancel: Arc<AtomicBool>,
 ) -> Result<(), CryptoError> {
     use std::fs::File;
 
-    let tmp_file_path = output_file.with_extension(format!(
-        "{}.tmp",
-        output_file.extension().and_then(|s| s.to_str()).unwrap_or("tmp")
-    ));
-
-    let input = File::open(&input_file)?;
-    let tmp_output = File::create(&tmp_file_path)?;
-
-    let output_str = output_file.file_name().unwrap_or_default().to_str().unwrap_or("").to_string();
+    let input = File::open(input_file)?;
+    let output_str = output_file
+        .file_name()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or("")
+        .to_string();
 
     let mut buffered_input = BufReader::new(input);
     let mut metadata_bytes = Vec::new();
@@ -118,50 +156,26 @@ pub fn decrypt_worker(
     metadata_bytes.pop();
 
     let metadata: CryptoMetadata = serde_json::from_slice(&metadata_bytes)?;
+
     let request = CryptoRequest {
         algorithm: metadata.algorithm,
         mode: metadata.block_mode,
-        key: request.key.clone(),
-        iv: request.iv.clone(),
-        padding: None
+        key: key.key.clone(),
+        iv: key.iv.clone(),
+        padding: metadata.padding,
     };
 
-    let total: usize = metadata.size;
+    let total = metadata.size;
 
-    let result = {
-        let writer = ProgressWriter {
-            inner: tmp_output,
-            processed: 0,
-            total,
-            filename: output_str.clone(),
-            app: app.clone(),
-            cancel: cancel.clone()
-        };
-
-        let mut encryptor = Encryptor::new(request)?;
-        encryptor.decrypt(buffered_input, writer)
-    };
-
-    if let Err(e) = result {
-        let _ = std::fs::remove_file(&tmp_file_path)?;
-        return Err(e.into());
-    }
-
-    if cancel.load(std::sync::atomic::Ordering::SeqCst) {
-        let _ = std::fs::remove_file(&tmp_file_path)?;
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Interrupted,
-            "Encryption cancelled",
-        ).into());
-    }
-
-    std::fs::rename(&tmp_file_path, &output_file)?;
-
-    app.emit("crypto:done", CryptoProgress {
-        filename: output_str,
-        processed: total,
+    run_crypto_job(
+        app,
+        output_file,
         total,
-    })?;
-
-    Ok(())
+        output_str,
+        cancel,
+        |writer| {
+            let mut encryptor = Encryptor::new(request)?;
+            encryptor.decrypt(buffered_input, writer)
+        },
+    )
 }

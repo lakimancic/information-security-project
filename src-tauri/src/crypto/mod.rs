@@ -40,5 +40,6 @@ pub struct CryptoMetadata {
     pub created: String,
     pub algorithm: String,
     pub block_mode: Option<String>,
-    pub hash_algo: Option<String>
+    pub hash_algo: Option<String>,
+    pub padding: Option<String>,
 }

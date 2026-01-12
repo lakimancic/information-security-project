@@ -6,6 +6,10 @@ pub enum FilesError {
     InvalidFilename,
     #[error("File Explorer Internal Error")]
     ExplorerInternalError,
+    #[error("File System Watcher Internal Error")]
+    WatcherInternalError,
+    #[error("Watcher already running")]
+    WatcherAlreadyRunning,
 }
 
 #[derive(serde::Serialize)]
@@ -15,6 +19,8 @@ enum ErrorName {
     Io(String),
     InvalidFilename(String),
     FileExplorerInternalError(String),
+    WatcherInternalError(String),
+    WatcherAlreadyRunning(String),
 }
 
 impl serde::Serialize for FilesError {
@@ -26,7 +32,9 @@ impl serde::Serialize for FilesError {
         let name = match self {
             Self::Io(_) => ErrorName::Io(message),
             Self::InvalidFilename => ErrorName::InvalidFilename(message),
-            FilesError::ExplorerInternalError => ErrorName::FileExplorerInternalError(message),
+            Self::ExplorerInternalError => ErrorName::FileExplorerInternalError(message),
+            Self::WatcherInternalError => ErrorName::WatcherInternalError(message),
+            Self::WatcherAlreadyRunning => ErrorName::WatcherAlreadyRunning(message),
         };
         name.serialize(serializer)
     }
