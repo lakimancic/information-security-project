@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 use crate::crypto::api::jobs::JobRegistry;
 use crate::crypto::commands::{encrypt_file, stop_processing, decrypt_file};
 use crate::files::commands::{get_files, change_dir, go_dir_back, set_current_dir};
+use crate::files::commands::{stop_file_watching, start_file_watching};
 use crate::key_manager::commands::{list_keys, find_keys_by_algo, generate_new_key, find_key};
 use crate::files::file_explorer::FileExplorer;
 use crate::files::fsw::WatcherState;
@@ -45,7 +46,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_files, change_dir, go_dir_back, set_current_dir,
             list_keys, find_keys_by_algo, generate_new_key, find_key,
-            encrypt_file, stop_processing, decrypt_file
+            encrypt_file, stop_processing, decrypt_file,
+            stop_file_watching, start_file_watching,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

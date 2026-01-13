@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpmc::channel;
-use notify::{EventKind, Watcher};
-use crate::AppState;
+use notify::{Watcher};
+use serde::Deserialize;
+use tauri::Emitter;
 use crate::crypto::api::jobs::{try_start_decrypt, try_start_encrypt, JobRegistry};
 use crate::crypto::CryptoRequest;
-use crate::crypto::errors::CryptoError;
+use crate::crypto::errors::CryptoErrorEvent;
 use crate::files::errors::FilesError;
 use crate::key_manager::key::PlainKey;
 
@@ -15,6 +15,7 @@ pub struct WatcherService {
     pub(crate) handle: std::thread::JoinHandle<()>,
 }
 
+#[derive(Deserialize, Clone)]
 pub enum WatchMode {
     Encrypt(CryptoRequest),
     Decrypt(PlainKey),
@@ -38,11 +39,22 @@ pub fn start_watcher(
 
         let (tx, rx) = channel();
 
-        let mut watcher = notify::recommended_watcher(move |res| {
+        let watcher = notify::recommended_watcher(move |res| {
             let _ = tx.send(res);
-        }).unwrap();
+        });
 
-        watcher.watch(&watch_path, notify::RecursiveMode::NonRecursive).unwrap();
+        if let Err(err) = watcher {
+            let _ = app.emit("fsw:error", err.to_string());
+            return;
+        }
+        let mut watcher = watcher.unwrap();
+
+        let result = watcher.watch(&watch_path, notify::RecursiveMode::NonRecursive);
+
+        if let Err(err) = result {
+            let _ = app.emit("fsw:error", err.to_string());
+            return;
+        }
 
         while !stop_thread.load(Ordering::SeqCst) {
             if let Ok(Ok(event)) = rx.recv_timeout(std::time::Duration::from_millis(200)) {
@@ -51,6 +63,9 @@ pub fn start_watcher(
                         if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
                             match &mode {
                                 WatchMode::Encrypt(req) => {
+                                    if matches!(path.extension().and_then(|s| s.to_str()), Some("enc" | "tmp")) {
+                                        continue;
+                                    }
                                     let _ = try_start_encrypt(
                                         app.clone(),
                                         jobs.clone(),
@@ -61,14 +76,16 @@ pub fn start_watcher(
                                     );
                                 }
                                 WatchMode::Decrypt(key) => {
-                                    let _ = try_start_decrypt(
-                                        app.clone(),
-                                        jobs.clone(),
-                                        watch_path.clone(),
-                                        output_path.clone(),
-                                        name.to_string(),
-                                        key.clone(),
-                                    );
+                                    if path.extension().and_then(|s| s.to_str()) == Some("enc") {
+                                        let _ = try_start_decrypt(
+                                            app.clone(),
+                                            jobs.clone(),
+                                            watch_path.clone(),
+                                            output_path.clone(),
+                                            name.to_string(),
+                                            key.clone(),
+                                        );
+                                    }
                                 }
                             }
                         }

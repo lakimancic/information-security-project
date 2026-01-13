@@ -39,7 +39,7 @@
 		onFileAction: (filename: string) => void;
 		onStopProcessingFile: (filename: string) => void;
 		onSetAbsolutePath: (path: string) => Promise<boolean>;
-		onLockChange: (value: boolean) => boolean;
+		onLockChange: (value: boolean) => Promise<boolean>;
 		onRefresh: () => void;
 	} = $props();
 
@@ -198,8 +198,8 @@
 		}
 	};
 
-	const handleLockClick = () => {
-		if (onLockChange(!locked)) {
+	const handleLockClick = async () => {
+		if (await onLockChange(!locked)) {
 			locked = !locked;
 		}
 	};

@@ -1,8 +1,7 @@
 use std::sync::atomic::Ordering;
 use crate::AppState;
-use crate::crypto::errors::CryptoError;
 use crate::files::errors::FilesError;
-use crate::files::file_entry::{FileEntry, FileExplore};
+use crate::files::file_entry::FileExplore;
 use crate::files::fsw::{start_watcher, WatchMode};
 
 #[tauri::command]

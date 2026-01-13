@@ -152,6 +152,45 @@
         })
     };
 
+    const onFileSystemWatch = async (locked: boolean) : Promise<boolean> => {
+        if (!key) return false;
+
+        if (!locked) {
+            try {
+                await invoke("stop_file_watching");
+                return true;
+            }
+            catch(err: any) {
+                console.error(err);
+                return false;
+            }
+        }
+        else {
+            let mode = operation === 'enc' ? {
+                Encrypt: {
+                    algorithm: algoStr,
+                    mode: modeStr,
+                    key: key.key,
+                    iv: key.iv
+                }
+            } : {
+                Decrypt: {
+                    key: key.key,
+                    iv: key.iv
+                }
+            };
+
+            try {
+                await invoke("start_file_watching", { mode });
+                return true;
+            }
+            catch(err: any) {
+                console.error(err);
+                return false;
+            }
+        }
+    };
+
     const onKeySet = (newKey: Key) => {
         cachedKeys[algoStr + ":" + modeStr] = newKey;
     };
@@ -202,6 +241,10 @@
             }));
 
             unlisteners.push(await listen<ProgressFile>("crypto:error", (event) => {
+                console.error(event.payload);
+            }));
+
+            unlisteners.push(await listen<ProgressFile>("fsw:error", (event) => {
                 console.error(event.payload);
             }));
         };
@@ -295,7 +338,7 @@
             class="" 
             bind:pwd={sourceCwd}
             files={sourceFiles} 
-            label="Source Directory" 
+            label={`Source Directory${sourceWatch ? " (Watching)" : ""}`} 
             bind:locked={sourceWatch}
             lockIcon={ScanEyeIcon}
             unlockIcon={EyeOffIcon}
@@ -304,7 +347,7 @@
             onFileAction={onFileAction}
             onStopProcessingFile={() => {}}
             onSetAbsolutePath={async newDir => await setAbsolutePath(newDir, true)}
-            onLockChange={() => true}
+            onLockChange={onFileSystemWatch}
             onRefresh={() => loadFiles(true)}
             constFilter={operation === 'dec' ? /^.*\.enc$/ : undefined}
             processingFiles={[]}
@@ -324,7 +367,7 @@
             onFileAction={() => {}}
             onStopProcessingFile={stopFileEncryption}
             onSetAbsolutePath={async newDir => await setAbsolutePath(newDir, false)}
-            onLockChange={() => true}
+            onLockChange={async () => true}
             onRefresh={() => loadFiles(false)}
             constFilter={operation === 'enc' ? /^.*\.enc$/ : undefined}
             processingFiles={processFilesArray}
