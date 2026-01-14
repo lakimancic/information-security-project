@@ -2,7 +2,8 @@ use std::sync::atomic::Ordering;
 use crate::AppState;
 use crate::files::errors::FilesError;
 use crate::files::file_entry::FileExplore;
-use crate::files::fsw::{start_watcher, WatchMode};
+use crate::files::fsw::start_watcher;
+use crate::files::watch::WatchMode;
 
 #[tauri::command]
 pub async fn get_files(

@@ -1,27 +1,14 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 use notify::{Watcher};
-use serde::Deserialize;
 use tauri::Emitter;
-use crate::crypto::api::jobs::{try_start_decrypt, try_start_encrypt, JobRegistry};
-use crate::crypto::CryptoRequest;
-use crate::crypto::errors::CryptoErrorEvent;
-use crate::files::errors::FilesError;
-use crate::key_manager::key::PlainKey;
+use crate::crypto::api::jobs::{JobRegistry};
+use crate::files::pending::{handle_event, process_pending, PendingMap};
+use crate::files::watch::{WatchMode, WatcherService};
 
-pub struct WatcherService {
-    pub(crate) stop: Arc<AtomicBool>,
-    pub(crate) handle: std::thread::JoinHandle<()>,
-}
-
-#[derive(Deserialize, Clone)]
-pub enum WatchMode {
-    Encrypt(CryptoRequest),
-    Decrypt(PlainKey),
-}
-
-pub type WatcherState = Arc<Mutex<Option<WatcherService>>>;
 
 pub fn start_watcher(
     watch_path: PathBuf,
@@ -34,66 +21,51 @@ pub fn start_watcher(
     let stop_thread = stop.clone();
 
     let handle = std::thread::spawn(move || {
-        use notify::{EventKind};
         use std::sync::mpsc::channel;
 
         let (tx, rx) = channel();
+        let mut pending: PendingMap = HashMap::new();
 
-        let watcher = notify::recommended_watcher(move |res| {
+        let mut watcher = match notify::recommended_watcher(move |res| {
             let _ = tx.send(res);
-        });
+        }) {
+            Ok(w) => w,
+            Err(e) => {
+                let _ = app.emit("fsw:error", e.to_string());
+                return;
+            }
+        };
 
-        if let Err(err) = watcher {
-            let _ = app.emit("fsw:error", err.to_string());
-            return;
-        }
-        let mut watcher = watcher.unwrap();
-
-        let result = watcher.watch(&watch_path, notify::RecursiveMode::NonRecursive);
-
-        if let Err(err) = result {
-            let _ = app.emit("fsw:error", err.to_string());
+        if let Err(e) = watcher.watch(&watch_path, notify::RecursiveMode::NonRecursive) {
+            let _ = app.emit("fsw:error", e.to_string());
             return;
         }
 
         while !stop_thread.load(Ordering::SeqCst) {
-            if let Ok(Ok(event)) = rx.recv_timeout(std::time::Duration::from_millis(200)) {
-                if matches!(event.kind, EventKind::Create(_)) {
-                    for path in event.paths {
-                        if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-                            match &mode {
-                                WatchMode::Encrypt(req) => {
-                                    if matches!(path.extension().and_then(|s| s.to_str()), Some("enc" | "tmp")) {
-                                        continue;
-                                    }
-                                    let _ = try_start_encrypt(
-                                        app.clone(),
-                                        jobs.clone(),
-                                        watch_path.clone(),
-                                        output_path.clone(),
-                                        name.to_string(),
-                                        req.clone(),
-                                    );
-                                }
-                                WatchMode::Decrypt(key) => {
-                                    if path.extension().and_then(|s| s.to_str()) == Some("enc") {
-                                        let _ = try_start_decrypt(
-                                            app.clone(),
-                                            jobs.clone(),
-                                            watch_path.clone(),
-                                            output_path.clone(),
-                                            name.to_string(),
-                                            key.clone(),
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+            match rx.recv_timeout(Duration::from_millis(200)) {
+                Ok(Ok(event)) => handle_event(
+                    event,
+                    &mut pending,
+                    &watch_path,
+                    &output_path,
+                    &jobs,
+                    &app,
+                    &mode,
+                ),
+                _ => {}
             }
+
+            process_pending(
+                &mut pending,
+                &watch_path,
+                &output_path,
+                &jobs,
+                &app,
+                &mode,
+            );
         }
     });
 
     WatcherService { stop, handle }
 }
+
