@@ -3,13 +3,15 @@
 mod files;
 pub mod crypto;
 mod key_manager;
+mod network;
+mod progress;
 
 use std::sync::{Arc, Mutex};
 use crate::crypto::api::jobs::JobRegistry;
-use crate::crypto::commands::{encrypt_file, stop_processing, decrypt_file};
-use crate::files::commands::{get_files, change_dir, go_dir_back, set_current_dir};
-use crate::files::commands::{stop_file_watching, start_file_watching};
-use crate::key_manager::commands::{list_keys, find_keys_by_algo, generate_new_key, find_key};
+use crate::crypto::commands::{decrypt_file, encrypt_file, stop_processing};
+use crate::files::commands::{change_dir, get_files, go_dir_back, set_current_dir};
+use crate::files::commands::{start_file_watching, stop_file_watching};
+use crate::key_manager::commands::{find_key, find_keys_by_algo, generate_new_key, list_keys};
 use crate::files::file_explorer::FileExplorer;
 use crate::files::watch::WatcherState;
 use crate::key_manager::key_manager::KeyManager;

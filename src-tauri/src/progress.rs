@@ -17,19 +17,7 @@ pub struct ProgressWriter<W> {
     pub(crate) filename: String,
     pub(crate) app: AppHandle,
     pub(crate) cancel: Arc<AtomicBool>,
-}
-
-impl<W> ProgressWriter<W> {
-    pub fn new(inner: W, filename: String, total: usize, app: AppHandle) -> Self {
-        Self {
-            inner,
-            processed: 0,
-            total,
-            filename,
-            app,
-            cancel: Arc::new(AtomicBool::new(false)),
-        }
-    }
+    pub(crate) event: String,
 }
 
 impl<W: Write> Write for ProgressWriter<W> {
@@ -45,7 +33,7 @@ impl<W: Write> Write for ProgressWriter<W> {
         self.processed += written;
 
         let _ = self.app.emit(
-            "crypto:progress",
+            &self.event,
             CryptoProgress {
                 processed: self.processed,
                 total: self.total,

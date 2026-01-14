@@ -1,8 +1,7 @@
 use std::{collections::HashMap, sync::{Arc, Mutex}, thread};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool};
 use tauri::Emitter;
-use crate::AppState;
 use crate::crypto::api::worker::{decrypt_worker, encrypt_worker};
 use crate::crypto::CryptoRequest;
 use crate::crypto::errors::{CryptoError, CryptoErrorEvent};

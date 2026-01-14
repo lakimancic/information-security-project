@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use chrono::{DateTime, Utc};
 use tauri::Emitter;
-use crate::crypto::api::progress::{CryptoProgress, ProgressWriter};
+use crate::progress::{CryptoProgress, ProgressWriter};
 use crate::crypto::{CryptoMetadata, CryptoRequest};
 use crate::crypto::encryptor::Encryptor;
 use crate::crypto::errors::CryptoError;
@@ -39,6 +39,7 @@ where
             filename: filename.clone(),
             app: app.clone(),
             cancel: cancel.clone(),
+            event: "crypto:progress".into(),
         };
 
         run(writer)
