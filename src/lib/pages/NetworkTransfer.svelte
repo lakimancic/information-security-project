@@ -1,6 +1,6 @@
 <script lang="ts">
 	import FileExplorer from "$lib/components/ui/file-explorer/FileExplorer.svelte";
-    import { HardDriveUploadIcon, LockIcon, LockOpenIcon } from "@lucide/svelte";
+    import { HardDriveUploadIcon, LockIcon, LockOpenIcon, XCircleIcon } from "@lucide/svelte";
     import * as Select from "$lib/components/ui/select/index";
 	import { blockCiphers, blockModes, streamCiphers, type Key } from "$lib/types/crypto";
 	import KeyDialog from "$lib/components/ui/key-dialog/KeyDialog.svelte";
@@ -314,9 +314,48 @@
             </button>
         </div>
         <div class="w-full grid grid-cols-3">
-            <div>RED</div>
-            <div class="col-span-2">
-                BLUE
+            <div class="grid grid-rows-2">
+                <div class="flex flex-col items-center justify-center gap-3">
+                    <p>Listening...</p>
+                    <button class="bg-primary hover:bg-primary/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200">Listen for Files</button>
+                </div>
+                <div class="flex flex-col items-center justify-center gap-3">
+                    <p>Listening...</p>
+                    <button class="bg-primary hover:bg-primary/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200r">Listen for Key</button>
+                </div>
+            </div>
+            <div class="col-span-2 h-60 p-4 flex flex-col">
+                <div class="flex bg-bg-1 px-2 py-1 text-fg-2">
+                    <p class="flex-1">IP Address</p>
+                    <p class="flex-1">Key Size</p>
+                </div>
+                <div class="w-full h-full overflow-auto">
+                    <div class="flex px-3 py-1 hover:bg-bg-1 relative odd:bg-bg-1/50">
+                        <p class="flex-1">127.0.0.1</p>
+                        <p class="flex-1">30B</p>
+                        <XCircleIcon class="absolute right-4 text-error cursor-pointer" />
+                    </div>
+                    <div class="flex px-3 py-1">
+                        <p class="flex-1">127.0.0.1</p>
+                        <p class="flex-1">30B</p>
+                    </div>
+                    <div class="flex px-3 py-1">
+                        <p class="flex-1">127.0.0.1</p>
+                        <p class="flex-1">30B</p>
+                    </div>
+                    <div class="flex px-3 py-1">
+                        <p class="flex-1">127.0.0.1</p>
+                        <p class="flex-1">30B</p>
+                    </div>
+                    <div class="flex px-3 py-1">
+                        <p class="flex-1">127.0.0.1</p>
+                        <p class="flex-1">30B</p>
+                    </div>
+                    <div class="flex px-3 py-1">
+                        <p class="flex-1">127.0.0.1</p>
+                        <p class="flex-1">30B</p>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="flex-1 min-h-0">
