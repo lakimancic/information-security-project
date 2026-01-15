@@ -3,7 +3,7 @@
 	import type { LocalFile, ProgressFile } from "$lib/components/ui/file-explorer/utils";
 	import KeyDialog from "$lib/components/ui/key-dialog/KeyDialog.svelte";
 	import * as Select from "$lib/components/ui/select/index";
-	import type { CipherTag, Key } from "$lib/types/crypto";
+	import { blockCiphers, blockModes, streamCiphers, type Key } from "$lib/types/crypto";
 	import { EyeOffIcon, LockIcon, LockOpenIcon, ScanEyeIcon } from "@lucide/svelte";
     import { invoke } from '@tauri-apps/api/core';
     import { listen } from "@tauri-apps/api/event";
@@ -27,19 +27,6 @@
 
     let destLocked = $state(false);
     let sourceWatch = $state(false);
-
-    const streamCiphers = [
-        { value: "stream:a5/1", label: "A5/1" }
-    ];
-
-    const blockCiphers : CipherTag[] = [
-        { value: "block:xtea", label: "XTEA" },
-        { value: "block:aes256", label: "AES-256" }
-    ];
-
-    const blockModes : CipherTag[] = [
-        { value: "mode:ofb", label: "OFB" }
-    ];
 
     let algo = $derived.by(() => {
         return [...blockCiphers, ...streamCiphers].find(v => v.value === algoStr) ?? null
@@ -203,8 +190,8 @@
     };
 
     const onModeSelect = (newMode: string) => {
-        if (cachedKeys[algo + ":" + newMode])
-            key = cachedKeys[algo + ":" + newMode];
+        if (cachedKeys[algoStr + ":" + newMode])
+            key = cachedKeys[algoStr + ":" + newMode];
         else
             key = null;
     };
@@ -333,9 +320,9 @@
     >{operation === 'enc' ? 'Encrypt' : 'Decrypt'}</button>
 </div>
 <div class="flex flex-1 min-h-0">
-    <div class="flex-1 p-4 min-h-0 overflow-hidden">
+    <div class="flex-1 p-4 min-h-0 overflow-hidden flex flex-col">
         <FileExplorer 
-            class="" 
+            class="h-full" 
             bind:pwd={sourceCwd}
             files={sourceFiles} 
             label={`Source Directory${sourceWatch ? " (Watching)" : ""}`} 
@@ -353,9 +340,9 @@
             processingFiles={[]}
         />
     </div>
-    <div class="flex-1 p-4 min-h-0 overflow-hidden">
+    <div class="flex-1 p-4 min-h-0 overflow-hidden flex flex-col">
         <FileExplorer 
-            class="" 
+            class="h-full" 
             pwd={destCwd} 
             files={destFiles} 
             label={`Destination Directory${destLocked ? " (Locked)" : ""}`} 

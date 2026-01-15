@@ -10,6 +10,7 @@ use crate::crypto::api::jobs::{CryptoJob, JobRegistry};
 use crate::crypto::{CryptoMetadata, CryptoRequest};
 use crate::crypto::encryptor::Encryptor;
 use crate::crypto::errors::{CryptoError, CryptoErrorEvent};
+use crate::key_manager::key::PlainKey;
 use crate::network::errors::NetworkError;
 use crate::progress::{CryptoProgress, ProgressWriter};
 
@@ -53,7 +54,7 @@ pub fn try_start_encrypt_send(
         jobs.lock().unwrap().remove(&filename);
 
         if let Err(err) = result {
-            let _ = app.emit("network:send_error", CryptoErrorEvent {
+            let _ = app.emit("network:error", CryptoErrorEvent {
                 err: err.to_string(),
                 filename,
             });
@@ -109,13 +110,13 @@ fn send_worker(
         filename: filename.clone(),
         app: app.clone(),
         cancel: cancel.clone(),
-        event: "network:send_progress".into()
+        event: "network:send:progress".into()
     };
 
     let mut encryptor = Encryptor::new(request.clone())?;
 
     let _ = app.emit(
-        "network:send_start",
+        "network:send:start",
         CryptoProgress {
             filename: filename.clone(),
             processed: 0,
@@ -126,7 +127,7 @@ fn send_worker(
     encryptor.encrypt(input, writer)?;
 
     let _ = app.emit(
-        "network:send_done",
+        "network:send:done",
         CryptoProgress {
             filename,
             processed: total,
@@ -134,5 +135,29 @@ fn send_worker(
         },
     );
 
+    Ok(())
+}
+
+pub fn try_send_key(
+    app: tauri::AppHandle,
+    addr: &SocketAddr,
+    key: &PlainKey
+) -> Result<(), NetworkError> {
+    let tcp_stream = TcpStream::connect(addr)?;
+    tcp_stream.set_nodelay(true)?;
+
+    let mut buf_writer = BufWriter::new(tcp_stream);
+
+    let key_len = key.key.len() as u16;
+    buf_writer.write_all(&key_len.to_le_bytes())?;
+    buf_writer.write_all(&key.key)?;
+    if let Some(iv) = key.iv.as_ref() {
+        let iv_len = iv.len() as u16;
+        buf_writer.write_all(&iv_len.to_le_bytes())?;
+        buf_writer.write_all(iv)?;
+    }
+    else {
+        buf_writer.write_all(&0u16.to_le_bytes())?;
+    }
     Ok(())
 }

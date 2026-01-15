@@ -1,3 +1,3 @@
 mod sender;
 mod errors;
-mod commands;
+pub mod commands;

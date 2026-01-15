@@ -6,6 +6,7 @@
 	import NavBar from '$lib/components/ui/navbar/NavBar.svelte';
 	import ThemeToggle from '$lib/components/ui/theme-toggle/ThemeToggle.svelte';
 	import LocalFileSystem from '$lib/pages/LocalFileSystem.svelte';
+	import NetworkTransfer from '$lib/pages/NetworkTransfer.svelte';
 </script>
 
 <main class="h-screen text-fg-0 flex overflow-hidden">
@@ -23,6 +24,9 @@
 			</div>
 			{#if route.path === '/local'}
 				<LocalFileSystem />
+			{/if}
+			{#if route.path === '/remote'}
+				<NetworkTransfer />
 			{/if}
 		</div>
 	{/if}

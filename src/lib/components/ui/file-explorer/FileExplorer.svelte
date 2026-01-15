@@ -224,7 +224,7 @@
 	});
 </script>
 
-<div class="flex flex-col {className} h-full min-h-0 box-border">
+<div class="flex flex-col {className} box-border">
 	<p class="p-2 text-center text-xl text-fg-2">{label}</p>
 	<div class="flex bg-bg-2 p-2 text-sm text-primary font-bold gap-2">
 		<input

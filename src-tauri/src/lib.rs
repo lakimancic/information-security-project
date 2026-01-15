@@ -12,6 +12,7 @@ use crate::crypto::commands::{decrypt_file, encrypt_file, stop_processing};
 use crate::files::commands::{change_dir, get_files, go_dir_back, set_current_dir};
 use crate::files::commands::{start_file_watching, stop_file_watching};
 use crate::key_manager::commands::{find_key, find_keys_by_algo, generate_new_key, list_keys};
+use crate::network::commands::{send_file, send_key};
 use crate::files::file_explorer::FileExplorer;
 use crate::files::watch::WatcherState;
 use crate::key_manager::key_manager::KeyManager;
@@ -50,6 +51,7 @@ pub fn run() {
             list_keys, find_keys_by_algo, generate_new_key, find_key,
             encrypt_file, stop_processing, decrypt_file,
             stop_file_watching, start_file_watching,
+            send_file, send_key
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
