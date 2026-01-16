@@ -1,6 +1,6 @@
 use std::sync::atomic::Ordering;
 use crate::AppState;
-use crate::crypto::api::jobs::{try_start_decrypt, try_start_encrypt, JobRegistry};
+use crate::crypto::api::jobs::{try_start_decrypt, try_start_encrypt};
 use crate::crypto::CryptoRequest;
 use crate::crypto::errors::CryptoError;
 use crate::key_manager::key::PlainKey;

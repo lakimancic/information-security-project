@@ -5,13 +5,8 @@ use tauri::Emitter;
 use crate::crypto::api::worker::{decrypt_worker, encrypt_worker};
 use crate::crypto::CryptoRequest;
 use crate::crypto::errors::{CryptoError, CryptoErrorEvent};
+use crate::jobs::{CryptoJob, JobRegistry};
 use crate::key_manager::key::PlainKey;
-
-pub struct CryptoJob {
-    pub cancel: Arc<AtomicBool>,
-}
-
-pub type JobRegistry = Arc<Mutex<HashMap<String, CryptoJob>>>;
 
 
 fn try_start_job<F>(

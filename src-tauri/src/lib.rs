@@ -5,9 +5,10 @@ pub mod crypto;
 mod key_manager;
 mod network;
 mod progress;
+mod jobs;
 
 use std::sync::{Arc, Mutex};
-use crate::crypto::api::jobs::JobRegistry;
+use tauri::Listener;
 use crate::crypto::commands::{decrypt_file, encrypt_file, stop_processing};
 use crate::files::commands::{change_dir, get_files, go_dir_back, set_current_dir};
 use crate::files::commands::{start_file_watching, stop_file_watching};
@@ -15,10 +16,15 @@ use crate::key_manager::commands::{find_key, find_keys_by_algo, generate_new_key
 use crate::network::commands::{send_file, send_key};
 use crate::files::file_explorer::FileExplorer;
 use crate::files::watch::WatcherState;
+use crate::jobs::{JobRegistry, ListenerControl, ReceiverRegistry};
 use crate::key_manager::key_manager::KeyManager;
 
 pub struct AppState {
     jobs: JobRegistry,
+    send_jobs: JobRegistry,
+    recv_jobs: ReceiverRegistry,
+    listener: Option<ListenerControl>,
+
     source_explorer: Mutex<FileExplorer>,
     dest_explorer: Mutex<FileExplorer>,
     key_manager: Mutex<KeyManager>,
@@ -34,6 +40,9 @@ pub fn run() {
             dest_explorer: Mutex::new(FileExplorer::new()),
             key_manager: Mutex::new(KeyManager::new()),
             jobs: JobRegistry::default(),
+            send_jobs: JobRegistry::default(),
+            recv_jobs: ReceiverRegistry::default(),
+            listener: None,
             watcher: Arc::new(Mutex::new(None)),
         })
         .setup(|app| {

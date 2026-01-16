@@ -10,6 +10,9 @@ pub enum NetworkError {
     #[error("Network Internal Error: {0}")]
     NetworkInternalError(String),
 
+    #[error("File is not sending")]
+    FileIsNotSending,
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
@@ -29,6 +32,7 @@ pub enum NetworkError {
 enum NetworkErrorName {
     CryptoError(String),
     NetworkInternalError(String),
+    FileIsNotSending(String),
     Io(String),
     Other(String),
     Json(String),
@@ -47,6 +51,7 @@ impl serde::Serialize for NetworkError {
             Self::NetworkInternalError(_) => {
                 NetworkErrorName::NetworkInternalError(message)
             }
+            Self::FileIsNotSending => NetworkErrorName::FileIsNotSending(message),
             Self::Io(_) => NetworkErrorName::Io(message),
             Self::Other(_) => NetworkErrorName::Other(message),
             Self::Json(_) => NetworkErrorName::Json(message),

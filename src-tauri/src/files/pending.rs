@@ -2,8 +2,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::time::Duration;
-use crate::crypto::api::jobs::{try_start_decrypt, try_start_encrypt, JobRegistry};
+use crate::crypto::api::jobs::{try_start_decrypt, try_start_encrypt};
 use crate::files::watch::WatchMode;
+use crate::jobs::JobRegistry;
 
 pub type PendingMap = HashMap<PathBuf, Instant>;
 

@@ -6,10 +6,10 @@ use std::sync::atomic::AtomicBool;
 use chrono::Utc;
 use tauri::Emitter;
 use std::thread;
-use crate::crypto::api::jobs::{CryptoJob, JobRegistry};
 use crate::crypto::{CryptoMetadata, CryptoRequest};
 use crate::crypto::encryptor::Encryptor;
 use crate::crypto::errors::{CryptoError, CryptoErrorEvent};
+use crate::jobs::{CryptoJob, JobRegistry};
 use crate::key_manager::key::PlainKey;
 use crate::network::errors::NetworkError;
 use crate::progress::{CryptoProgress, ProgressWriter};
@@ -54,7 +54,7 @@ pub fn try_start_encrypt_send(
         jobs.lock().unwrap().remove(&filename);
 
         if let Err(err) = result {
-            let _ = app.emit("network:error", CryptoErrorEvent {
+            let _ = app.emit("network:send:error", CryptoErrorEvent {
                 err: err.to_string(),
                 filename,
             });

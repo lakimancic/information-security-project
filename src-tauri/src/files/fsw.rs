@@ -5,10 +5,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use notify::{Watcher};
 use tauri::Emitter;
-use crate::crypto::api::jobs::{JobRegistry};
 use crate::files::pending::{handle_event, process_pending, PendingMap};
 use crate::files::watch::{WatchMode, WatcherService};
-
+use crate::jobs::JobRegistry;
 
 pub fn start_watcher(
     watch_path: PathBuf,
