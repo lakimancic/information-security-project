@@ -1,6 +1,7 @@
 use std::net::AddrParseError;
 use thiserror::Error;
 use crate::crypto::errors::CryptoError;
+use crate::key_manager::errors::KeysError;
 
 #[derive(Error, Debug)]
 pub enum NetworkError {
@@ -24,6 +25,12 @@ pub enum NetworkError {
 
     #[error(transparent)]
     AddrParseError(#[from] AddrParseError),
+
+    #[error("Key for address {0} not found")]
+    SocketKeyNotFound(String),
+
+    #[error("Invalid key received")]
+    InvalidSocketKey,
 }
 
 #[derive(serde::Serialize)]
@@ -37,6 +44,8 @@ enum NetworkErrorName {
     Other(String),
     Json(String),
     AddrParseError(String),
+    SocketKeyError(String),
+    InvalidSocketKey(String),
 }
 
 impl serde::Serialize for NetworkError {
@@ -58,6 +67,8 @@ impl serde::Serialize for NetworkError {
             Self::AddrParseError(_) => {
                 NetworkErrorName::AddrParseError(message)
             }
+            Self::SocketKeyNotFound(_) => NetworkErrorName::SocketKeyError(message),
+            Self::InvalidSocketKey => NetworkErrorName::InvalidSocketKey(message),
         };
 
         name.serialize(serializer)

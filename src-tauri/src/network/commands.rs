@@ -7,9 +7,10 @@ use tauri::Emitter;
 use crate::AppState;
 use crate::crypto::CryptoRequest;
 use crate::crypto::errors::CryptoError;
+use crate::jobs::ListenerControl;
 use crate::key_manager::key::PlainKey;
 use crate::network::errors::NetworkError;
-use crate::network::receiver::spawn_recv_worker;
+use crate::network::receiver::{read_key_from_stream, spawn_recv_worker};
 use crate::network::sender::{try_send_key, try_start_encrypt_send};
 
 #[tauri::command]
@@ -60,24 +61,37 @@ pub async fn send_key(
 }
 
 #[tauri::command]
-pub fn start_listening(
+pub fn start_file_listening(
     state: tauri::State<AppState>,
     app: tauri::AppHandle,
     port: u16,
 ) -> Result<(), NetworkError> {
     let listener = TcpListener::bind(("0.0.0.0", port))?;
+
     let stop_flag = Arc::new(AtomicBool::new(false));
+
+    {
+        let mut ctrl = state.file_listener.lock()
+            .map_err(|err| NetworkError::NetworkInternalError(err.to_string()))?;
+        ctrl.stop = stop_flag.clone();
+    }
     let thread_stop = stop_flag.clone();
+
     let jobs = state.recv_jobs.clone();
 
     let destination_explorer = state.dest_explorer.lock()
         .map_err(|err| CryptoError::CryptoInternalError(err.to_string()))?;
     let destination_path = destination_explorer.get_current_path_buf();
 
+    let net_keys = state.net_keys.clone();
+
     thread::spawn(move || {
         match listener.set_nonblocking(true) {
             Ok(_) => {}
-            Err(_) => { return; }
+            Err(_) => {
+                let _ = app.emit("network:error", NetworkError::NetworkInternalError("Failed to start file listener".into()).to_string() );
+                return;
+            }
         };
 
         loop {
@@ -87,24 +101,146 @@ pub fn start_listening(
 
             match listener.accept() {
                 Ok((stream, addr)) => {
-                    spawn_recv_worker(app.clone(), jobs.clone(), stream, destination_path.clone(), addr, PlainKey{
-                        key: vec![],
-                        iv: None
-                    });
+                    let locked_net_keys = net_keys.lock().unwrap();
+                    let key = locked_net_keys.get(&addr.ip());
+                    match key {
+                        Some(key) => spawn_recv_worker(app.clone(), jobs.clone(), stream, destination_path.clone(), addr, key.clone()),
+                        None => {
+                            let _ = app.emit("network:error", NetworkError::SocketKeyNotFound(addr.to_string()).to_string());
+                        }
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(100));
                 }
                 Err(e) => {
-                    if e.kind() == std::io::ErrorKind::WouldBlock {
-                        thread::sleep(Duration::from_millis(100));
-                        continue;
-                    }
-                    else {
-                        let _ = app.emit("network:error", e.to_string());
-                        break;
-                    }
+                    let _ = app.emit("network:error", e.to_string());
+                    break;
                 }
             }
         }
     });
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn stop_file_listening(state: tauri::State<AppState>) {
+    if let Ok(ctrl) = state.file_listener.lock() {
+        ctrl.stop.store(true, Ordering::SeqCst);
+    }
+}
+
+#[tauri::command]
+pub fn approve_incoming(
+    state: tauri::State<AppState>,
+    addr: String,
+) -> Result<(), NetworkError> {
+    let socket: SocketAddr = addr.parse()?;
+
+    let (lock, cvar) = &*state.recv_jobs;
+
+    let mut map = lock
+        .lock()
+        .map_err(|e| NetworkError::NetworkInternalError(e.to_string()))?;
+
+    if let Some(ctrl) = map.get_mut(&socket) {
+        ctrl.approved = true;
+    }
+
+    cvar.notify_all();
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn deny_incoming(
+    state: tauri::State<AppState>,
+    addr: String,
+) -> Result<(), NetworkError> {
+    let socket: SocketAddr = addr.parse()?;
+
+    let (lock, cvar) = &*state.recv_jobs;
+
+    let mut map = lock
+        .lock()
+        .map_err(|e| NetworkError::NetworkInternalError(e.to_string()))?;
+
+    if let Some(ctrl) = map.get_mut(&socket) {
+        ctrl.canceled = true;
+    }
+
+    cvar.notify_all();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn start_key_listening(
+    state: tauri::State<AppState>,
+    app: tauri::AppHandle,
+    port: u16,
+) -> Result<(), NetworkError> {
+    let listener = TcpListener::bind(("0.0.0.0", port))?;
+    let stop_flag = Arc::new(AtomicBool::new(false));
+
+    {
+        let mut ctrl = state.file_listener.lock()
+            .map_err(|err| NetworkError::NetworkInternalError(err.to_string()))?;
+        ctrl.stop = Arc::new(AtomicBool::new(false));
+    }
+
+    let thread_stop = stop_flag.clone();
+    let net_keys = state.net_keys.clone();
+
+    thread::spawn(move || {
+        match listener.set_nonblocking(true) {
+            Ok(_) => {}
+            Err(_) => {
+                let _ = app.emit("network:error", NetworkError::NetworkInternalError("Failed to start key listener".into()).to_string() );
+                return;
+            }
+        };
+
+        loop {
+            if thread_stop.load(Ordering::SeqCst) {
+                break;
+            }
+
+            match listener.accept() {
+                Ok((mut stream, addr)) => {
+
+                    match read_key_from_stream(&mut stream) {
+                        Ok(key) => {
+                            if let Ok(mut map) = net_keys.lock() {
+                                map.insert(addr.ip(), key.clone());
+                            }
+
+                            let _ = app.emit("network:key:saved", addr.to_string());
+                        }
+                        Err(err) => {
+                            let _ = app.emit("network:error", err.to_string());
+                        }
+                    }
+
+                    break;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(100));
+                }
+                Err(e) => {
+                    let _ = app.emit("network:error", e.to_string());
+                    break;
+                }
+            }
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn stop_key_listening(state: tauri::State<AppState>) {
+    if let Ok(ctrl) = state.key_listener.lock() {
+        ctrl.stop.store(true, Ordering::SeqCst);
+    }
 }

@@ -7,7 +7,9 @@ mod network;
 mod progress;
 mod jobs;
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicBool;
 use tauri::Listener;
 use crate::crypto::commands::{decrypt_file, encrypt_file, stop_processing};
 use crate::files::commands::{change_dir, get_files, go_dir_back, set_current_dir};
@@ -18,16 +20,19 @@ use crate::files::file_explorer::FileExplorer;
 use crate::files::watch::WatcherState;
 use crate::jobs::{JobRegistry, ListenerControl, ReceiverRegistry};
 use crate::key_manager::key_manager::KeyManager;
+use crate::network::NetworkKeys;
 
 pub struct AppState {
     jobs: JobRegistry,
     send_jobs: JobRegistry,
     recv_jobs: ReceiverRegistry,
-    listener: Option<ListenerControl>,
+    file_listener: Mutex<ListenerControl>,
+    key_listener: Mutex<ListenerControl>,
 
     source_explorer: Mutex<FileExplorer>,
     dest_explorer: Mutex<FileExplorer>,
     key_manager: Mutex<KeyManager>,
+    net_keys: Arc<Mutex<NetworkKeys>>,
     watcher: WatcherState
 }
 
@@ -42,8 +47,10 @@ pub fn run() {
             jobs: JobRegistry::default(),
             send_jobs: JobRegistry::default(),
             recv_jobs: ReceiverRegistry::default(),
-            listener: None,
+            file_listener: Mutex::new(ListenerControl { stop: Arc::new(AtomicBool::new(false) )}),
+            key_listener: Mutex::new(ListenerControl { stop: Arc::new(AtomicBool::new(false) )}),
             watcher: Arc::new(Mutex::new(None)),
+            net_keys: Arc::new(Mutex::new(HashMap::new()))
         })
         .setup(|app| {
             if cfg!(debug_assertions) {

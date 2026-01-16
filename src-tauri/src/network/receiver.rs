@@ -162,3 +162,40 @@ fn recv_decrypt_worker(
 
     Ok(())
 }
+
+pub fn read_key_from_stream(stream: &mut TcpStream) -> Result<PlainKey, NetworkError> {
+    use std::io::{Read};
+
+    const MAX_KEY_BYTES: usize = 4096 / 8;
+
+    let mut len_buf = [0u8; 2];
+    stream.read_exact(&mut len_buf)?;
+    let key_len = u16::from_be_bytes(len_buf) as usize;
+
+    if key_len == 0 || key_len > MAX_KEY_BYTES {
+        return Err(NetworkError::InvalidSocketKey);
+    }
+
+    let mut key_bytes = vec![0u8; key_len];
+    stream.read_exact(&mut key_bytes)?;
+
+    stream.read_exact(&mut len_buf)?;
+    let iv_len = u16::from_be_bytes(len_buf) as usize;
+
+    let iv = if iv_len == 0 {
+        None
+    } else {
+        if iv_len > MAX_KEY_BYTES {
+            return Err(NetworkError::InvalidSocketKey);
+        }
+
+        let mut iv_bytes = vec![0u8; iv_len];
+        stream.read_exact(&mut iv_bytes)?;
+        Some(iv_bytes)
+    };
+
+    Ok(PlainKey {
+        key: key_bytes,
+        iv,
+    })
+}
