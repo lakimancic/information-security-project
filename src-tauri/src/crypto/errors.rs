@@ -6,6 +6,9 @@ pub enum CryptoError {
     #[error("Unknown cipher: {0}")]
     UnknownCipher(String),
 
+    #[error("Unknown hash function: {0}")]
+    UnknownHashFunction(String),
+
     #[error("Invalid parameters: {0}")]
     InvalidParams(String),
 
@@ -26,6 +29,9 @@ pub enum CryptoError {
 
     #[error("Invalid padding")]
     InvalidPadding,
+
+    #[error("Invalid file size")]
+    InvalidFileSize,
 
     #[error("Missing padding algorithm")]
     MissingPaddingAlgorithm,
@@ -51,6 +57,7 @@ pub enum CryptoError {
 #[serde(rename_all = "camelCase")]
 enum ErrorName {
     UnknownCipher(String),
+    UnknownHashFunction(String),
     InvalidParams(String),
     InvalidKeyLength(String),
     InvalidIvLength(String),
@@ -58,6 +65,7 @@ enum ErrorName {
     InvalidBlockSize(String),
     MissingBlockMode(String),
     InvalidPadding(String),
+    InvalidFileSize(String),
     MissingPaddingAlgorithm(String),
     CryptoInternalError(String),
     FileIsNotProcessing(String),
@@ -74,9 +82,11 @@ impl serde::Serialize for CryptoError {
         let message = self.to_string();
         let name = match self {
             Self::UnknownCipher(_) => ErrorName::UnknownCipher(message),
+            Self::UnknownHashFunction(_) => ErrorName::UnknownHashFunction(message),
             Self::InvalidParams(_) => ErrorName::InvalidParams(message),
             Self::InvalidKeyLength => ErrorName::InvalidKeyLength(message),
             Self::InvalidIvLength => ErrorName::InvalidIvLength(message),
+            Self::InvalidFileSize => ErrorName::InvalidFileSize(message),
             Self::EncryptionError(_) => ErrorName::EncryptionError(message),
             Self::InvalidBlockSize => ErrorName::InvalidBlockSize(message),
             Self::MissingBlockMode => ErrorName::MissingBlockMode(message),

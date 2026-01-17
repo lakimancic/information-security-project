@@ -40,7 +40,7 @@ pub async fn generate_new_key(
         .map_err(|e| KeysError::KeyManagerInternalError(e.to_string()))?;
 
     let (key_size, iv_size) = KeySizes::get_size_of(&algorithm, &mode)?;
-
+    
     key_manager.generate_new(name, password, key_size, iv_size)
 }
 

@@ -1,17 +1,28 @@
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::thread;
+use serde::Serialize;
 use tauri::Emitter;
 use crate::crypto::{CryptoMetadata, CryptoRequest};
 use crate::crypto::encryptor::Encryptor;
 use crate::crypto::errors::CryptoErrorEvent;
+use crate::crypto::hash_factory::HashFactory;
+use crate::hash_wrappers::HashWriter;
 use crate::jobs::{PendingControl, ReceiverRegistry};
 use crate::key_manager::key::PlainKey;
 use crate::network::errors::NetworkError;
 use crate::progress::{CryptoProgress, ProgressWriter};
+
+
+#[derive(Serialize, Clone)]
+pub struct PendingFile {
+    filename: String,
+    sock_addr: SocketAddr,
+    size: usize,
+}
 
 pub fn spawn_recv_worker(
     app: tauri::AppHandle,
@@ -101,7 +112,7 @@ fn recv_worker(
         iv: key.iv.clone(),
     };
 
-    recv_decrypt_worker(app, &output_path, metadata.filename, metadata.size, request, reader, cancel)
+    recv_decrypt_worker(app, &output_path, metadata.filename, metadata.size, request, &mut reader, metadata.hash_algo, cancel)
 }
 
 fn recv_decrypt_worker(
@@ -110,7 +121,8 @@ fn recv_decrypt_worker(
     filename: String,
     total: usize,
     request: CryptoRequest,
-    buffered_reader: BufReader<&TcpStream>,
+    mut buffered_reader: &mut BufReader<&TcpStream>,
+    hash_algo: Option<String>,
     cancel: Arc<AtomicBool>,
 ) -> Result<(), NetworkError> {
     let tmp_file_path = output_file.with_extension(format!(
@@ -123,19 +135,37 @@ fn recv_decrypt_worker(
 
     let tmp_output = std::fs::File::create(&tmp_file_path)?;
 
-    let result = {
-        let writer = ProgressWriter {
+    let result: Result<(), NetworkError> = {
+        let mut writer = ProgressWriter {
             inner: tmp_output,
             processed: 0,
             total,
             filename: filename.clone(),
             app: app.clone(),
             cancel: cancel.clone(),
-            event: "network:progress".into(),
+            event: "network:recv:progress".into(),
         };
 
+        let hash_function = match hash_algo {
+            Some(hash_algo) => Some(HashFactory::create(&hash_algo)?),
+            None => None,
+        };
+        let mut hash_writer = HashWriter::new(&mut writer, hash_function);
+
         let mut encryptor = Encryptor::new(request)?;
-        encryptor.decrypt(buffered_reader, writer)
+        encryptor.decrypt(&mut buffered_reader, &mut hash_writer, total)?;
+
+        if let Some(hash) = hash_writer.finalize_hash() {
+            let real_hash = hash?;
+            let mut expected_hash = vec![0u8; real_hash.len()];
+            buffered_reader.read_exact(&mut expected_hash)?;
+
+            if expected_hash != real_hash {
+                return Err(NetworkError::HashVerificationFailed);
+            }
+        }
+
+        Ok(())
     };
 
     if let Err(e) = result {
@@ -170,7 +200,7 @@ pub fn read_key_from_stream(stream: &mut TcpStream) -> Result<PlainKey, NetworkE
 
     let mut len_buf = [0u8; 2];
     stream.read_exact(&mut len_buf)?;
-    let key_len = u16::from_be_bytes(len_buf) as usize;
+    let key_len = u16::from_le_bytes(len_buf) as usize;
 
     if key_len == 0 || key_len > MAX_KEY_BYTES {
         return Err(NetworkError::InvalidSocketKey);
@@ -180,7 +210,7 @@ pub fn read_key_from_stream(stream: &mut TcpStream) -> Result<PlainKey, NetworkE
     stream.read_exact(&mut key_bytes)?;
 
     stream.read_exact(&mut len_buf)?;
-    let iv_len = u16::from_be_bytes(len_buf) as usize;
+    let iv_len = u16::from_le_bytes(len_buf) as usize;
 
     let iv = if iv_len == 0 {
         None

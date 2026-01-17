@@ -9,6 +9,8 @@ use std::thread;
 use crate::crypto::{CryptoMetadata, CryptoRequest};
 use crate::crypto::encryptor::Encryptor;
 use crate::crypto::errors::{CryptoError, CryptoErrorEvent};
+use crate::crypto::hash_factory::HashFactory;
+use crate::hash_wrappers::HashWriter;
 use crate::jobs::{CryptoJob, JobRegistry};
 use crate::key_manager::key::PlainKey;
 use crate::network::errors::NetworkError;
@@ -20,6 +22,7 @@ pub fn try_start_encrypt_send(
     source_path: PathBuf,
     request: CryptoRequest,
     filename: String,
+    hash_algo: Option<String>,
     ip: String,
     port: u16,
 ) -> Result<(), NetworkError> {
@@ -49,7 +52,7 @@ pub fn try_start_encrypt_send(
     let socket_addr = SocketAddr::new(ip_addr, port);
 
     thread::spawn(move || {
-        let result = send_worker(app.clone(), &input_file, &socket_addr, &request, cancel);
+        let result = send_worker(app.clone(), &input_file, &socket_addr, &request, hash_algo, cancel);
 
         jobs.lock().unwrap().remove(&filename);
 
@@ -69,6 +72,7 @@ fn send_worker(
     input_file: &Path,
     addr: &SocketAddr,
     request: &CryptoRequest,
+    hash_algo: Option<String>,
     cancel: Arc<AtomicBool>,
 ) -> Result<(), NetworkError> {
     use std::fs::File;
@@ -103,8 +107,8 @@ fn send_worker(
 
     buf_writer.write_all(&metadata_bytes)?;
 
-    let writer = ProgressWriter {
-        inner: buf_writer,
+    let mut writer = ProgressWriter {
+        inner: &mut buf_writer,
         processed: 0,
         total,
         filename: filename.clone(),
@@ -124,7 +128,21 @@ fn send_worker(
         },
     );
 
-    encryptor.encrypt(input, writer)?;
+    let hash_function = match hash_algo {
+        Some(algo) => Some(HashFactory::create(&algo)?),
+        None => None
+    };
+
+    let mut hash_writer = HashWriter::new(
+        &mut writer,
+        hash_function,
+    );
+
+    encryptor.encrypt(input, &mut hash_writer)?;
+
+    if let Some(hash) = hash_writer.finalize_hash() {
+        buf_writer.write_all(&hash?)?;
+    }
 
     let _ = app.emit(
         "network:send:done",

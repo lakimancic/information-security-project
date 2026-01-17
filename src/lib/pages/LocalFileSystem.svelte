@@ -103,7 +103,8 @@
                     algorithm: algoStr,
                     mode: mode ? modeStr : undefined,
                     key: key.key,
-                    iv: key.iv
+                    iv: key.iv,
+                    padding: 'pkcs7'
                 },
                 file: filename
             });

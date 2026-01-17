@@ -66,7 +66,7 @@
     };
 
     const handleGenerateKey = async () => {
-        invoke("generate_new_key", { algorithm: algo?.value ?? '', mode: algo?.value, name: genName, password: genPass })
+        invoke("generate_new_key", { algorithm: algo?.value ?? '', mode: mode?.value, name: genName, password: genPass })
             .then((res: any) => {
                 outputKey = {
                     ...res,

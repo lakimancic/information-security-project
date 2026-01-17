@@ -85,7 +85,8 @@ impl KeyManager {
             padding: Box::new(Pkcs7)
         });
 
-        cipher.decrypt(&mut input, &mut output).map_err(|_| KeysError::InvalidPassword)?;
+        let need_size = encrypted_key.key_size + encrypted_key.iv_size;
+        cipher.decrypt(&mut input, &mut output, need_size).map_err(|_| KeysError::InvalidPassword)?;
         let plaintext = output.into_inner();
 
         if plaintext.len() != encrypted_key.key_size + encrypted_key.iv_size + hash.len() {

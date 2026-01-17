@@ -24,14 +24,18 @@
     let sendIp = $state('');
     let sendPort = $state('');
 
-    let recvIp = $state('');
     let recvPort = $state('');
+    let recvKeyPort = $state('');
 
     let key = $state<Key|null>(null);
     let cachedKeys = $state<{ [algoMode: string] : Key}>({});
+    let networkKeys = $state<SvelteMap<string, number[]>>(new SvelteMap());
 
     let recvLocked = $state(false);
     let sendLocked = $state(false);
+
+    let fileListening = $state(false);
+    let keyListening = $state(false);
 
     let algo = $derived.by(() => {
         return [...blockCiphers, ...streamCiphers].find(v => v.value === algoStr) ?? null
@@ -40,7 +44,7 @@
         return blockModes.find(v => v.value === modeStr) ?? null
     });
 
-    let sendingFilesArray = $derived.by(() => {
+    const sendingFilesArray = $derived.by(() => {
         return Array.from(sendingFiles.values());
     });
 
@@ -154,6 +158,29 @@
         });
     };
 
+    const loadNetKeys = () => {
+        invoke('get_network_keys')
+        .then((res : any) => {
+            console.log(res);
+            networkKeys = res;
+            console.log(networkKeys);
+        });
+    };
+
+    const listenForKey = () => {
+        if (keyListening) return;
+
+        invoke('start_key_listening', {
+            port: recvKeyPort
+        })
+        .then(() => {
+            keyListening = true;
+        })
+        .catch(err => {
+            console.error(err);
+        });
+    };
+
     onMount(() => {
         loadFiles(true);
         loadFiles(false);
@@ -183,6 +210,11 @@
                         size: event.payload.total
                     });
                 }
+            }));
+
+            unlisteners.push(await listen("network:key:saved", (event) => {
+                loadNetKeys();
+                keyListening = false;
             }));
 
             unlisteners.push(await listen<ProgressFile>("network:error", (event) => {
@@ -304,14 +336,12 @@
     </div>
     <div class="flex-1 p-4 h-full min-h-0 overflow-hidden flex flex-col">
         <div class="w-full flex flex-wrap items-center px-5 py-1 gap-3">
-            <p>IP Address:</p>
-            <input type="text" class="outline-none border border-bg-5 data-[placeholder]:text-fg-3 w-60 py-1 px-3 rounded-md" placeholder="127.0.0.1" bind:value={recvIp} />
-            <p>Port:</p>
+            <p>File Listen Port:</p>
             <input type="number" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
             outline-none border border-bg-5 data-[placeholder]:text-fg-3 w-40 py-1 px-3 rounded-md" placeholder="443" bind:value={recvPort} />
-            <button>
-                <LockIcon class="bg-bg-3 hover:bg-bg-4 rounded-md p-2 size-10 mr-5 cursor-pointer text-fg-2" />
-            </button>
+            <p>Key Listen Port:</p>
+            <input type="number" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
+            outline-none border border-bg-5 data-[placeholder]:text-fg-3 w-40 py-1 px-3 rounded-md" placeholder="443" bind:value={recvKeyPort} />
         </div>
         <div class="w-full grid grid-cols-3">
             <div class="grid grid-rows-2">
@@ -320,8 +350,18 @@
                     <button class="bg-primary hover:bg-primary/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200">Listen for Files</button>
                 </div>
                 <div class="flex flex-col items-center justify-center gap-3">
-                    <p>Listening...</p>
-                    <button class="bg-primary hover:bg-primary/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200r">Listen for Key</button>
+                    {#if keyListening}
+                        <p>Listening for Key on :{recvKeyPort}...</p>
+                        <button 
+                            class="bg-error hover:bg-error/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
+                        >Stop Listening</button>
+                    {:else}
+                        <p>Listen for Key</p>
+                        <button 
+                            class="bg-primary hover:bg-primary/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
+                            onclick={listenForKey}
+                        >Listen for Key</button> 
+                    {/if}
                 </div>
             </div>
             <div class="col-span-2 h-60 p-4 flex flex-col">
@@ -330,31 +370,13 @@
                     <p class="flex-1">Key Size</p>
                 </div>
                 <div class="w-full h-full overflow-auto">
+                    {#each networkKeys.entries() as netKey}
                     <div class="flex px-3 py-1 hover:bg-bg-1 relative odd:bg-bg-1/50">
-                        <p class="flex-1">127.0.0.1</p>
-                        <p class="flex-1">30B</p>
+                        <p class="flex-1">{netKey[0]}</p>
+                        <p class="flex-1">{netKey[1][0]}{netKey[1][1] > 0 ? `+ ${netKey[1][1]}` : ''}B</p>
                         <XCircleIcon class="absolute right-4 text-error cursor-pointer" />
                     </div>
-                    <div class="flex px-3 py-1">
-                        <p class="flex-1">127.0.0.1</p>
-                        <p class="flex-1">30B</p>
-                    </div>
-                    <div class="flex px-3 py-1">
-                        <p class="flex-1">127.0.0.1</p>
-                        <p class="flex-1">30B</p>
-                    </div>
-                    <div class="flex px-3 py-1">
-                        <p class="flex-1">127.0.0.1</p>
-                        <p class="flex-1">30B</p>
-                    </div>
-                    <div class="flex px-3 py-1">
-                        <p class="flex-1">127.0.0.1</p>
-                        <p class="flex-1">30B</p>
-                    </div>
-                    <div class="flex px-3 py-1">
-                        <p class="flex-1">127.0.0.1</p>
-                        <p class="flex-1">30B</p>
-                    </div>
+                    {/each}
                 </div>
             </div>
         </div>

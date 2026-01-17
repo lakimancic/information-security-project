@@ -13,6 +13,11 @@ interface ProgressFile {
 	size?: number;
 };
 
+interface PendingFile {
+	filename: string;
+	sockAddr: string;
+};
+
 import ImageIcon from './icons/img_icon.png';
 import TextIcon from './icons/text_icon.png';
 import FolderIcon from './icons/folder_icon.png';

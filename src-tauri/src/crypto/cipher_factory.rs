@@ -17,7 +17,7 @@ impl CipherFactory {
             None => None,
             Some(mode_str) => if let Some(iv_str) = req.iv {
                 match mode_str.as_str() {
-                    "ofb" => Some(Box::new(OfbMode::new(iv_str))),
+                    "mode:ofb" => Some(Box::new(OfbMode::new(iv_str))),
                     _ => None
                 }
             } else { None }

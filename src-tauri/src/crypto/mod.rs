@@ -13,6 +13,7 @@ pub(crate) mod encryptor;
 pub(crate) mod padding;
 pub mod api;
 pub mod commands;
+pub mod hash_factory;
 
 pub enum CipherInstance {
     Stream(Box<dyn StreamCipher>),

@@ -6,6 +6,7 @@ mod key_manager;
 mod network;
 mod progress;
 mod jobs;
+pub mod hash_wrappers;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -15,7 +16,8 @@ use crate::crypto::commands::{decrypt_file, encrypt_file, stop_processing};
 use crate::files::commands::{change_dir, get_files, go_dir_back, set_current_dir};
 use crate::files::commands::{start_file_watching, stop_file_watching};
 use crate::key_manager::commands::{find_key, find_keys_by_algo, generate_new_key, list_keys};
-use crate::network::commands::{send_file, send_key};
+use crate::network::commands::{send_file, send_key, start_file_listening, stop_file_listening, approve_incoming, deny_incoming,
+                               start_key_listening, stop_key_listening, get_network_keys, remove_network_key, stop_sending};
 use crate::files::file_explorer::FileExplorer;
 use crate::files::watch::WatcherState;
 use crate::jobs::{JobRegistry, ListenerControl, ReceiverRegistry};
@@ -67,7 +69,9 @@ pub fn run() {
             list_keys, find_keys_by_algo, generate_new_key, find_key,
             encrypt_file, stop_processing, decrypt_file,
             stop_file_watching, start_file_watching,
-            send_file, send_key
+            send_file, send_key, stop_sending,
+            start_file_listening, stop_file_listening, approve_incoming, deny_incoming,
+            start_key_listening, stop_key_listening, get_network_keys, remove_network_key
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

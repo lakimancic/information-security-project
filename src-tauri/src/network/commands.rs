@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr, TcpListener};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -19,6 +20,7 @@ pub async fn send_file(
     app: tauri::AppHandle,
     request: CryptoRequest,
     file: String,
+    hash_algo: Option<String>,
     ip: String,
     port: u16,
 ) -> Result<(), NetworkError> {
@@ -29,7 +31,7 @@ pub async fn send_file(
 
     let source_path = source_explorer.get_current_path_buf();
 
-    try_start_encrypt_send(app, jobs, source_path, request, file, ip, port)
+    try_start_encrypt_send(app, jobs, source_path, request, file, hash_algo, ip, port)
 }
 
 #[tauri::command]
@@ -184,7 +186,7 @@ pub fn start_key_listening(
     let stop_flag = Arc::new(AtomicBool::new(false));
 
     {
-        let mut ctrl = state.file_listener.lock()
+        let mut ctrl = state.key_listener.lock()
             .map_err(|err| NetworkError::NetworkInternalError(err.to_string()))?;
         ctrl.stop = Arc::new(AtomicBool::new(false));
     }
@@ -218,7 +220,7 @@ pub fn start_key_listening(
                             let _ = app.emit("network:key:saved", addr.to_string());
                         }
                         Err(err) => {
-                            let _ = app.emit("network:error", err.to_string());
+                            let _ = app.emit("network:key:error", err.to_string());
                         }
                     }
 
@@ -228,7 +230,7 @@ pub fn start_key_listening(
                     thread::sleep(Duration::from_millis(100));
                 }
                 Err(e) => {
-                    let _ = app.emit("network:error", e.to_string());
+                    let _ = app.emit("network:key:error", e.to_string());
                     break;
                 }
             }
@@ -243,4 +245,40 @@ pub fn stop_key_listening(state: tauri::State<AppState>) {
     if let Ok(ctrl) = state.key_listener.lock() {
         ctrl.stop.store(true, Ordering::SeqCst);
     }
+}
+
+#[tauri::command]
+pub fn get_network_keys(
+    state: tauri::State<AppState>,
+) -> Result<HashMap<IpAddr, (usize, usize)>, NetworkError> {
+    let net_keys = state.net_keys.lock()
+        .map_err(|err| NetworkError::NetworkInternalError(err.to_string()))?;
+
+    let sizes: HashMap<IpAddr, (usize, usize)> = net_keys
+        .iter()
+        .map(|(ip, key)| {
+            let iv_len = key
+                .iv
+                .as_ref()
+                .map(|v| v.len())
+                .unwrap_or(0);
+
+            (*ip, (key.key.len(), iv_len))
+        })
+        .collect();
+
+    Ok(sizes)
+}
+
+#[tauri::command]
+pub fn remove_network_key(
+    state: tauri::State<AppState>,
+    ip_addr: IpAddr,
+) -> Result<(), NetworkError> {
+    let mut net_keys = state.net_keys.lock()
+        .map_err(|err| NetworkError::NetworkInternalError(err.to_string()))?;
+
+    net_keys.remove(&ip_addr);
+
+    Ok(())
 }
