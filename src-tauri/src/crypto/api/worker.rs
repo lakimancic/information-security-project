@@ -176,7 +176,7 @@ pub fn decrypt_worker(
         cancel,
         |writer| {
             let mut encryptor = Encryptor::new(request)?;
-            encryptor.decrypt(buffered_input, writer, metadata.size)
+            encryptor.decrypt(buffered_input, writer)
         },
     )
 }

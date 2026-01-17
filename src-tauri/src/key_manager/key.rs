@@ -14,3 +14,11 @@ pub struct PlainKey {
     pub key: Vec<u8>,
     pub iv: Option<Vec<u8>>,
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ShortKey {
+    pub name: String,
+    pub key_size: usize,
+    pub iv_size: usize,
+}

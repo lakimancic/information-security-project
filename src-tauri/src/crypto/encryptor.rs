@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::io::{Read, Write};
 use std::ops::Deref;
-use crate::crypto::{CipherInstance, CryptoRequest};
+use crate::crypto::{padding, CipherInstance, CryptoRequest};
 use crate::crypto::cipher_factory::CipherFactory;
 use crate::crypto::errors::CryptoError;
 
@@ -91,21 +91,17 @@ impl Encryptor {
         Ok(())
     }
 
-    pub fn decrypt<R, W>(&mut self, mut input: R, mut output: W, size: usize) -> Result<(), CryptoError>
+    pub fn decrypt<R, W>(&mut self, mut input: R, mut output: W) -> Result<(), CryptoError>
     where
         R: Read,
         W: Write,
     {
-        let mut rest_size = size;
         if let CipherInstance::Stream(ref mut stream_cipher) = self.cipher {
             let mut buffer = vec![0u8; BUFFER_SIZE];
 
             stream_cipher.reset()?;
             loop {
-                if rest_size == 0 {
-                    break;
-                }
-                let n = input.read(&mut buffer[..min(rest_size, BUFFER_SIZE)])?;
+                let n = input.read(&mut buffer)?;
                 if n == 0 {
                     break;
                 }
@@ -113,7 +109,6 @@ impl Encryptor {
                     *b = stream_cipher.decrypt_byte(*b)?;
                 }
                 output.write_all(&buffer[..n])?;
-                rest_size -= n;
             }
         }
         else if let CipherInstance::Block { ref cipher, ref mut mode, ref padding } = self.cipher {
@@ -127,10 +122,7 @@ impl Encryptor {
             mode.reset()?;
 
             loop {
-                if rest_size == 0 {
-                    break;
-                }
-                let n = input.read(&mut buffer[..min(rest_size, BUFFER_SIZE)])?;
+                let n = input.read(&mut buffer)?;
                 if n == 0 {
                     break;
                 }
@@ -152,10 +144,6 @@ impl Encryptor {
 
                     if let Some(prev) = last_block.replace(block.to_vec()) {
                         output.write_all(&prev)?;
-                        if prev.len() > rest_size {
-                            return Err(CryptoError::InvalidFileSize);
-                        }
-                        rest_size -= prev.len();
                     }
                 }
 
@@ -166,16 +154,17 @@ impl Encryptor {
 
             padding.unpad(&mut final_block, bs)?;
             output.write_all(&final_block)?;
-            if final_block.len() > rest_size {
-                return Err(CryptoError::InvalidFileSize);
-            }
-            rest_size -= final_block.len();
-        }
-        if rest_size != 0 {
-            return Err(CryptoError::InvalidFileSize);
         }
 
         Ok(())
     }
 
+    pub fn padded_size(&self, size: usize) -> u64 {
+        if let CipherInstance::Block { ref cipher, ref mode, ref padding } = self.cipher {
+            padding.pad_size(size, cipher.block_size()) as u64
+        }
+        else {
+            size as u64
+        }
+    }
 }

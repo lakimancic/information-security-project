@@ -2,7 +2,7 @@
 	import { KeySquareIcon, XIcon } from "@lucide/svelte";
 	import { Dialog, Separator, Tabs } from "bits-ui";
     import * as Select from "$lib/components/ui/select/index";
-	import type { CipherTag, Key } from "$lib/types/crypto";
+	import type { CipherTag, Key, ShortKey } from "$lib/types/crypto";
     import { invoke } from '@tauri-apps/api/core';
 
     let {
@@ -55,7 +55,7 @@
             else {
                 invoke("list_keys")
                 .then(res => {
-                    keyNames = res as string[];
+                    keyNames = (res as ShortKey[]).map(sk => sk.name);
                     dialogOpen = value;
                 });
             }

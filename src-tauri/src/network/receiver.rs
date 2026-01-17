@@ -18,6 +18,7 @@ use crate::progress::{CryptoProgress, ProgressWriter};
 
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct PendingFile {
     filename: String,
     sock_addr: SocketAddr,
@@ -85,7 +86,11 @@ fn recv_worker(
             },
         );
     }
-    app.emit("network:recv:pending", metadata.clone())?;
+    app.emit("network:recv:pending", PendingFile {
+        filename: metadata.filename.clone(),
+        sock_addr: addr,
+        size: metadata.size,
+    })?;
 
     let (lock, cvar) = &*registry;
     let mut map = lock.lock().unwrap();
@@ -95,7 +100,7 @@ fn recv_worker(
     }
 
     if map[&addr].canceled {
-        app.emit("network:recv:denied", metadata.filename.clone())?;
+        app.emit("network:recv:denied", addr)?;
         return Ok(());
     }
 
@@ -135,6 +140,15 @@ fn recv_decrypt_worker(
 
     let tmp_output = std::fs::File::create(&tmp_file_path)?;
 
+    let _ = app.emit(
+        "network:recv:start",
+        CryptoProgress {
+            filename: filename.clone(),
+            processed: 0,
+            total,
+        },
+    );
+
     let result: Result<(), NetworkError> = {
         let mut writer = ProgressWriter {
             inner: tmp_output,
@@ -153,7 +167,10 @@ fn recv_decrypt_worker(
         let mut hash_writer = HashWriter::new(&mut writer, hash_function);
 
         let mut encryptor = Encryptor::new(request)?;
-        encryptor.decrypt(&mut buffered_reader, &mut hash_writer, total)?;
+        let take_size = encryptor.padded_size(total);
+
+        let mut limited_reader = buffered_reader.take(take_size);
+        encryptor.decrypt(&mut limited_reader, &mut hash_writer)?;
 
         if let Some(hash) = hash_writer.finalize_hash() {
             let real_hash = hash?;
@@ -184,7 +201,7 @@ fn recv_decrypt_worker(
 
     std::fs::rename(&tmp_file_path, output_file)?;
 
-    app.emit("network:done", CryptoProgress {
+    app.emit("network:recv:done", CryptoProgress {
         filename,
         processed: total,
         total,

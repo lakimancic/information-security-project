@@ -2,9 +2,9 @@
 	import FileExplorer from "$lib/components/ui/file-explorer/FileExplorer.svelte";
     import { HardDriveUploadIcon, LockIcon, LockOpenIcon, XCircleIcon } from "@lucide/svelte";
     import * as Select from "$lib/components/ui/select/index";
-	import { blockCiphers, blockModes, streamCiphers, type Key } from "$lib/types/crypto";
+	import { blockCiphers, blockModes, hashModes, streamCiphers, type Key } from "$lib/types/crypto";
 	import KeyDialog from "$lib/components/ui/key-dialog/KeyDialog.svelte";
-	import type { LocalFile, ProgressFile } from "$lib/components/ui/file-explorer/utils";
+	import type { LocalFile, PendingFile, ProgressFile } from "$lib/components/ui/file-explorer/utils";
 	import { SvelteMap } from "svelte/reactivity";
 	import { invoke } from "@tauri-apps/api/core";
 	import { onMount } from "svelte";
@@ -16,10 +16,14 @@
     let recvFiles: LocalFile[] = $state([]);
     let recvCwd: string = $state('');
 
+    let recvQueue: PendingFile[] = $state([]);
+
     let sendingFiles = $state<SvelteMap<string, ProgressFile>>(new SvelteMap());
+    let receivingFiles = $state<SvelteMap<string, ProgressFile>>(new SvelteMap());
 
     let algoStr = $state('');
     let modeStr = $state('');
+    let hashStr = $state('');
 
     let sendIp = $state('');
     let sendPort = $state('');
@@ -48,6 +52,10 @@
         return Array.from(sendingFiles.values());
     });
 
+    const receivingFilesArray = $derived.by(() => {
+        return Array.from(receivingFiles.values());
+    })
+
     const triggerContent = $derived(
         streamCiphers.find(c => c.value === algoStr)?.label ??
         blockCiphers.find(c => c.value === algoStr)?.label ?? "Select Cipher"
@@ -55,6 +63,10 @@
 
     const triggerContentMode = $derived(
         blockModes.find(m => m.value === modeStr)?.label ?? "Select Mode"
+    );
+
+    const triggerContentHash = $derived(
+        hashModes.find(h => h.value === hashStr)?.label ?? "Select Hash"
     );
 
     const onKeySet = (newKey: Key) => {
@@ -75,8 +87,8 @@
             key = null;
     };
 
-    const loadFiles = async (source: boolean) => {
-        await invoke('get_files', { source }).then((res: any) => {
+    const loadFiles = async (source: boolean, reset: boolean = false) => {
+        await invoke('get_files', { source, reset }).then((res: any) => {
             if (source) {
                 sendFiles = res.files as LocalFile[];
                 sendCwd = res.pwd as string;
@@ -128,7 +140,8 @@
                 algorithm: algoStr,
                 mode: mode ? modeStr : undefined,
                 key: key.key,
-                iv: key.iv
+                iv: key.iv,
+                hash_algo: hashStr
             },
             file: filename,
             ip: sendIp,
@@ -160,30 +173,55 @@
 
     const loadNetKeys = () => {
         invoke('get_network_keys')
-        .then((res : any) => {
-            console.log(res);
-            networkKeys = res;
-            console.log(networkKeys);
+        .then((res: any) => {
+            networkKeys.clear();
+            Object.entries(res).forEach(entry => {
+                networkKeys.set(entry[0], entry[1] as number[]);
+            })
         });
     };
 
-    const listenForKey = () => {
-        if (keyListening) return;
+    const listenFor = (files: boolean) => {
+        const listening = files ? fileListening : keyListening;
+        if (listening) return;
 
-        invoke('start_key_listening', {
-            port: recvKeyPort
+        invoke(files ? 'start_file_listening' : 'start_key_listening', {
+            port: files ? recvPort : recvKeyPort
         })
         .then(() => {
-            keyListening = true;
+            if (files) fileListening = true;
+            else keyListening = true;
         })
         .catch(err => {
             console.error(err);
         });
     };
 
+    const stopListening = (file: boolean) => {
+        const listening = file ? fileListening : keyListening;
+        if (!listening) return;
+
+        invoke(file ? 'stop_file_listening' : 'stop_key_listening')
+        .then(() => {
+            if (file) fileListening = false;
+            else keyListening = false;
+        })
+        .catch(err => {
+            console.error(err);
+        });
+    };
+    
+    const approveDenyFile = (sockAddr: string, accept: boolean) => {
+        invoke(accept ? 'approve_incoming' : 'deny_incoming', { addr: sockAddr })
+        .then(() => {})
+        .catch(err => {
+            console.error(err);
+        });
+    };
+
     onMount(() => {
-        loadFiles(true);
-        loadFiles(false);
+        loadFiles(true, true);
+        loadFiles(false, true);
 
         const unlisteners: Array<() => void> = [];
 
@@ -219,6 +257,43 @@
 
             unlisteners.push(await listen<ProgressFile>("network:error", (event) => {
                 console.error(event.payload);
+            }));
+
+            unlisteners.push(await listen("network:recv:error", (event) => {
+                console.error(event.payload);
+            }));
+
+            unlisteners.push(await listen<PendingFile>("network:recv:pending", (event) => {
+                recvQueue.push(event.payload);
+            }));
+
+            unlisteners.push(await listen<string>("network:recv:denied", (event) => {
+                recvQueue = recvQueue.filter(pf => pf.sockAddr !== event.payload);
+            }));
+
+            unlisteners.push(await listen<ProgressFile>("network:recv:start", (event) => {
+                recvQueue = recvQueue.filter(pf => pf.filename !== event.payload.filename);
+                if (!receivingFiles.has(event.payload.filename)) {
+                    receivingFiles.set(event.payload.filename, {
+                        ...event.payload,
+                        size: event.payload.total
+                    });
+                }
+            })); 
+            
+            unlisteners.push(await listen<ProgressFile>("network:recv:done", (event) => {
+                if (receivingFiles.has(event.payload.filename)) {
+                    receivingFiles.delete(event.payload.filename);
+                }
+            }));
+
+            unlisteners.push(await listen<ProgressFile>("network:recv:progress", (event) => {
+                if (receivingFiles.has(event.payload.filename)) {
+                    receivingFiles.set(event.payload.filename, {
+                        ...event.payload,
+                        size: event.payload.total
+                    });
+                }
             }));
         };
 
@@ -290,6 +365,36 @@
                 </Select.Root>
             {/if}
         </div>
+        <div class="w-full flex flex-wrap items-center px-2 py-1">
+            <p class="mx-3">Choose hash:</p>
+            <Select.Root type="single" bind:value={hashStr}>
+                <Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
+                    {triggerContentHash}
+                </Select.Trigger>
+                <Select.Content class="bg-bg-2 text-fg-1 border-bg-4">
+                    <Select.Group>
+                        <Select.Item 
+                            value="" 
+                            label="None" 
+                            disabled={hashStr === ''}
+                            class="hover:text-fg-0 hover:bg-bg-3/50"
+                        >
+                            None
+                        </Select.Item>
+                        {#each hashModes as hashMode}
+                            <Select.Item 
+                                value={hashMode.value}
+                                label={hashMode.label} 
+                                disabled={hashStr === hashMode.value} 
+                                class="hover:text-fg-0 hover:bg-bg-3/50"
+                            >
+                                {hashMode.label}
+                            </Select.Item>
+                        {/each}
+                    </Select.Group>
+                </Select.Content>
+            </Select.Root>
+        </div>
         <div class="w-full flex flex-wrap items-center px-5 py-1 gap-3">
             <p>IP Address:</p>
             <input type="text" class="outline-none border border-bg-5 data-[placeholder]:text-fg-3 w-60 py-1 px-3 rounded-md" placeholder="127.0.0.1" bind:value={sendIp} />
@@ -331,6 +436,8 @@
                 onRefresh={() => loadFiles(true)}
                 constFilter={undefined}
                 processingFiles={sendingFilesArray}
+                pendingFiles={[]}
+                onAcceptRejectFile={() => {}}
             />
         </div>
     </div>
@@ -346,20 +453,32 @@
         <div class="w-full grid grid-cols-3">
             <div class="grid grid-rows-2">
                 <div class="flex flex-col items-center justify-center gap-3">
-                    <p>Listening...</p>
-                    <button class="bg-primary hover:bg-primary/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200">Listen for Files</button>
+                    {#if fileListening}
+                        <p>Listening for Key on :{recvPort}...</p>
+                        <button 
+                            class="bg-error hover:bg-error/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
+                            onclick={() => stopListening(false)}
+                        >Stop Listening</button>
+                    {:else}
+                        <p>Listen for Files</p>
+                        <button 
+                            class="bg-primary hover:bg-primary/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
+                            onclick={() => listenFor(false)}
+                        >Listen for Files</button> 
+                    {/if}
                 </div>
                 <div class="flex flex-col items-center justify-center gap-3">
                     {#if keyListening}
                         <p>Listening for Key on :{recvKeyPort}...</p>
                         <button 
                             class="bg-error hover:bg-error/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
+                            onclick={() => stopListening(true)}
                         >Stop Listening</button>
                     {:else}
                         <p>Listen for Key</p>
                         <button 
                             class="bg-primary hover:bg-primary/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
-                            onclick={listenForKey}
+                            onclick={() => listenFor(true)}
                         >Listen for Key</button> 
                     {/if}
                 </div>
@@ -397,7 +516,9 @@
                 onLockChange={async () => true}
                 onRefresh={() => loadFiles(false)}
                 constFilter={undefined}
-                processingFiles={[]}
+                processingFiles={receivingFilesArray}
+                pendingFiles={recvQueue}
+                onAcceptRejectFile={approveDenyFile}
             />
         </div>
     </div>

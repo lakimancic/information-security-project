@@ -1,14 +1,15 @@
 <script lang="ts">
-	import type { LocalFile, ProgressFile } from '$lib/components/ui/file-explorer/utils';
+	import type { LocalFile, PendingFile, ProgressFile } from '$lib/components/ui/file-explorer/utils';
 	import { sizeToString, typeToIcon } from '$lib/components/ui/file-explorer/utils';
 	import { writable } from 'svelte/store';
-	import { ArrowDown, ArrowUp, RotateCwIcon, XIcon, type IconProps } from '@lucide/svelte';
+	import { ArrowDown, ArrowUp, CheckIcon, RotateCwIcon, XIcon, type IconProps } from '@lucide/svelte';
 	import type { Component } from 'svelte';
 
 	let {
 		"class": className,
 		files = [],
 		processingFiles,
+		pendingFiles,
 		pwd = $bindable(''),
 		label,
 		locked = $bindable(false),
@@ -23,9 +24,11 @@
 		onSetAbsolutePath,
 		onLockChange,
 		onRefresh,
+		onAcceptRejectFile,
 	} : {
 		"class": string;
 		files: LocalFile[];
+		pendingFiles: PendingFile[];
 		processingFiles: ProgressFile[];
 		pwd: string;
 		label: string;
@@ -41,6 +44,7 @@
 		onSetAbsolutePath: (path: string) => Promise<boolean>;
 		onLockChange: (value: boolean) => Promise<boolean>;
 		onRefresh: () => void;
+		onAcceptRejectFile: (sockAddr: string, accept: boolean) => void;
 	} = $props();
 
 	const searchText = writable('');
@@ -271,6 +275,51 @@
 			{/each}
 		</div>
 		<div class="flex-1 min-h-0 overflow-y-auto">
+			{#each pendingFiles as file, fileIndex}
+				<div
+					bind:this={rowEls[fileIndex]}
+					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm box-border outline-none bg-warning/10 hover:bg-warning/15 relative`}
+					role="button"
+					onkeydown={() => {}}
+					tabindex="-1"
+				>
+					<div class="py-2 pl-2">
+						<img
+							src={typeToIcon("")}
+							class="h-6"
+							alt="file-icon"
+						/>
+					</div>
+
+					<div class="px-2 py-2 truncate">
+						{file.filename}
+					</div>
+
+					<div class="px-4 py-2 truncate w-full">
+						Sender: {file.sockAddr}
+					</div>
+
+					<div class="px-4 py-2 text-left">
+						{file.size ? sizeToString(file.size) : ""}
+					</div>
+
+					<div class="px-4 py-2 truncate">Pending File</div>
+					<div class="flex absolute right-5">
+						<button
+						class="text-success cursor-pointer hover:bg-success/30 rounded-full p-1"
+						onclick={() => onAcceptRejectFile(file.sockAddr, true)}
+						>
+							<CheckIcon />
+						</button>
+						<button
+						class="text-error cursor-pointer hover:bg-error/30 rounded-full p-1"
+						onclick={() => onAcceptRejectFile(file.sockAddr, false)}
+						>
+							<XIcon />
+						</button>
+					</div>
+				</div>
+			{/each}
 			{#each processingFiles as file, fileIndex}
 				<div
 					bind:this={rowEls[fileIndex]}

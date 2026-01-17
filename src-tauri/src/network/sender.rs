@@ -86,7 +86,7 @@ fn send_worker(
     let mut buf_writer = BufWriter::new(tcp_stream);
 
     let filename = input_file
-        .file_stem()
+        .file_name()
         .unwrap_or_default()
         .to_str()
         .unwrap_or("")

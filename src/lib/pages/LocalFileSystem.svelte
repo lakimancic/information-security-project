@@ -48,8 +48,8 @@
         blockModes.find(m => m.value === modeStr)?.label ?? "Select Mode"
     );
 
-    const loadFiles = async (source: boolean) => {
-        await invoke('get_files', { source }).then((res: any) => {
+    const loadFiles = async (source: boolean, reset: boolean = false) => {
+        await invoke('get_files', { source, reset }).then((res: any) => {
             if (source) {
                 sourceFiles = res.files as LocalFile[];
                 sourceCwd = res.pwd as string;
@@ -198,8 +198,8 @@
     };
 
     onMount(() => {
-        loadFiles(true);
-        loadFiles(false);
+        loadFiles(true, true);
+        loadFiles(false, true);
 
         const unlisteners: Array<() => void> = [];
 
@@ -339,6 +339,8 @@
             onRefresh={() => loadFiles(true)}
             constFilter={operation === 'dec' ? /^.*\.enc$/ : undefined}
             processingFiles={[]}
+            pendingFiles={[]}
+            onAcceptRejectFile={() => {}}
         />
     </div>
     <div class="flex-1 p-4 min-h-0 overflow-hidden flex flex-col">
@@ -359,6 +361,8 @@
             onRefresh={() => loadFiles(false)}
             constFilter={operation === 'enc' ? /^.*\.enc$/ : undefined}
             processingFiles={processFilesArray}
+            pendingFiles={[]}
+            onAcceptRejectFile={() => {}}
         />
     </div>
 </div>

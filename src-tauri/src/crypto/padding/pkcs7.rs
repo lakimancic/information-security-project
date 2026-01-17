@@ -27,4 +27,8 @@ impl Padding for Pkcs7 {
         data.truncate(data.len() - pad_len);
         Ok(())
     }
+
+    fn pad_size(&self, size: usize, block_size: usize) -> usize {
+        block_size - size % block_size
+    }
 }

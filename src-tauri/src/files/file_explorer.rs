@@ -12,7 +12,11 @@ pub struct FileExplorer {
 
 impl FileExplorer {
     pub fn new() -> Self {
-        Self { current_path: std::env::home_dir().get_or_insert_default().clone() }
+        Self { current_path: std::env::home_dir().unwrap_or_default().clone() }
+    }
+    
+    pub fn reset(&mut self) {
+        self.current_path = std::env::home_dir().unwrap_or_default().clone();
     }
 
     pub fn change_dir(&mut self, dir: String) -> bool {

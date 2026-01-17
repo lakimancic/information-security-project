@@ -8,13 +8,19 @@ use crate::files::watch::WatchMode;
 #[tauri::command]
 pub async fn get_files(
     state: tauri::State<'_, AppState>,
-    source: bool
+    source: bool,
+    reset: bool
 ) -> Result<FileExplore, FilesError> {
     let mut explorer = if source {
         state.source_explorer.lock()
     } else {
         state.dest_explorer.lock()
     }.map_err(|_| FilesError::ExplorerInternalError)?;
+
+    if reset {
+        explorer.reset();
+    }
+
     let pwd = explorer.get_current_path();
 
     Ok(FileExplore {

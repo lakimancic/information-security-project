@@ -11,16 +11,15 @@ use crate::crypto::hash::blake_256::Blake256;
 use crate::crypto::hash::HashFunction;
 use crate::crypto::padding::pkcs7::Pkcs7;
 use crate::key_manager::errors::KeysError;
-use crate::key_manager::key::{EncryptedKey, PlainKey};
+use crate::key_manager::key::{EncryptedKey, PlainKey, ShortKey};
 
 pub struct KeyManager {
     keys: HashMap<String, EncryptedKey>,
-    path: PathBuf,
 }
 
 impl KeyManager {
     pub fn new() -> Self {
-        Self { keys: HashMap::new(), path: std::env::current_dir().unwrap().join("data.keys") }
+        Self { keys: HashMap::new() }
     }
 
     pub fn generate_new(&mut self, key_name: String, password: String, key_size: usize, iv_size: usize) -> Result<PlainKey, KeysError> {
@@ -86,7 +85,7 @@ impl KeyManager {
         });
 
         let need_size = encrypted_key.key_size + encrypted_key.iv_size;
-        cipher.decrypt(&mut input, &mut output, need_size).map_err(|_| KeysError::InvalidPassword)?;
+        cipher.decrypt(&mut input, &mut output).map_err(|_| KeysError::InvalidPassword)?;
         let plaintext = output.into_inner();
 
         if plaintext.len() != encrypted_key.key_size + encrypted_key.iv_size + hash.len() {
@@ -107,8 +106,12 @@ impl KeyManager {
         Ok(PlainKey { key, iv })
     }
 
-    pub fn list_keys(&self) -> Result<Vec<String>, KeysError> {
-        Ok(self.keys.keys().cloned().collect())
+    pub fn list_keys(&self) -> Result<Vec<ShortKey>, KeysError> {
+        Ok(self.keys.iter().map(|(name, key)| ShortKey {
+            name: name.clone(),
+            key_size: key.key_size,
+            iv_size: key.iv_size
+        }).collect())
     }
 
     pub fn find_keys_by_size(&self, key_size: usize, iv_size: usize) -> Result<Vec<String>, KeysError> {
@@ -131,8 +134,8 @@ impl KeyManager {
         }
     }
 
-    pub fn save_to_disk(&self) -> Result<(), KeysError> {
-        let file = File::create(&self.path)?;
+    pub fn save_to_disk(&self, path: &PathBuf) -> Result<(), KeysError> {
+        let file = File::create(&path)?;
         let mut writer = BufWriter::new(file);
 
         writer.write(b"KOXKM\xde\xad")?;
@@ -152,8 +155,8 @@ impl KeyManager {
         Ok(())
     }
 
-    pub fn load_from_disk(&mut self) -> Result<(), KeysError> {
-        let file = File::open(&self.path)?;
+    pub fn load_from_disk(&mut self, path: &PathBuf) -> Result<(), KeysError> {
+        let file = File::open(&path)?;
         let mut reader = BufReader::new(file);
 
         let mut magic = [0u8; 7];
@@ -165,8 +168,6 @@ impl KeyManager {
         let mut len_bytes = [0u8; 8];
         reader.read_exact(&mut len_bytes)?;
         let num_keys = usize::from_le_bytes(len_bytes);
-
-        self.keys.clear();
 
         for _ in 0..num_keys {
             let mut name_bytes = Vec::new();

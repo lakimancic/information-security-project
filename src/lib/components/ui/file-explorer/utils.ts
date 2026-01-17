@@ -16,6 +16,7 @@ interface ProgressFile {
 interface PendingFile {
 	filename: string;
 	sockAddr: string;
+	size: number;
 };
 
 import ImageIcon from './icons/img_icon.png';
@@ -65,4 +66,4 @@ export function sizeToString(size: number) {
 	return `${tmpSize} GB`;
 }
 
-export type { LocalFile, ProgressFile };
+export type { LocalFile, ProgressFile, PendingFile };

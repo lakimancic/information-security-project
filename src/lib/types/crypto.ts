@@ -9,6 +9,12 @@ interface CipherTag {
     value: string;
 }
 
+interface ShortKey {
+    name: string;
+    keySize: number;
+    ivSize: number;
+}
+
 const streamCiphers = [
     { value: "stream:a5/1", label: "A5/1" }
 ];
@@ -22,5 +28,9 @@ const blockModes : CipherTag[] = [
     { value: "mode:ofb", label: "OFB" }
 ];
 
-export type { Key, CipherTag };
-export { streamCiphers, blockCiphers, blockModes };
+const hashModes : CipherTag[] = [
+    { value: "blake256", label: "BLAKE-256" }
+];
+
+export type { Key, CipherTag, ShortKey };
+export { streamCiphers, blockCiphers, blockModes, hashModes };

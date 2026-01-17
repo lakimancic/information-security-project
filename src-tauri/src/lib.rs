@@ -15,7 +15,8 @@ use tauri::Listener;
 use crate::crypto::commands::{decrypt_file, encrypt_file, stop_processing};
 use crate::files::commands::{change_dir, get_files, go_dir_back, set_current_dir};
 use crate::files::commands::{start_file_watching, stop_file_watching};
-use crate::key_manager::commands::{find_key, find_keys_by_algo, generate_new_key, list_keys};
+use crate::key_manager::commands::{find_key, find_keys_by_algo, generate_new_key, list_keys, remove_key,
+                                   load_keys, save_keys};
 use crate::network::commands::{send_file, send_key, start_file_listening, stop_file_listening, approve_incoming, deny_incoming,
                                start_key_listening, stop_key_listening, get_network_keys, remove_network_key, stop_sending};
 use crate::files::file_explorer::FileExplorer;
@@ -30,7 +31,6 @@ pub struct AppState {
     recv_jobs: ReceiverRegistry,
     file_listener: Mutex<ListenerControl>,
     key_listener: Mutex<ListenerControl>,
-
     source_explorer: Mutex<FileExplorer>,
     dest_explorer: Mutex<FileExplorer>,
     key_manager: Mutex<KeyManager>,
@@ -66,7 +66,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_files, change_dir, go_dir_back, set_current_dir,
-            list_keys, find_keys_by_algo, generate_new_key, find_key,
+            list_keys, find_keys_by_algo, generate_new_key, find_key, remove_key, load_keys, save_keys,
             encrypt_file, stop_processing, decrypt_file,
             stop_file_watching, start_file_watching,
             send_file, send_key, stop_sending,

@@ -7,6 +7,7 @@
 	import ThemeToggle from '$lib/components/ui/theme-toggle/ThemeToggle.svelte';
 	import LocalFileSystem from '$lib/pages/LocalFileSystem.svelte';
 	import NetworkTransfer from '$lib/pages/NetworkTransfer.svelte';
+	import KeyManager from '$lib/pages/KeyManager.svelte';
 </script>
 
 <main class="h-screen text-fg-0 flex overflow-hidden">
@@ -27,6 +28,9 @@
 			{/if}
 			{#if route.path === '/remote'}
 				<NetworkTransfer />
+			{/if}
+			{#if route.path === '/keys'}
+				<KeyManager />
 			{/if}
 		</div>
 	{/if}
