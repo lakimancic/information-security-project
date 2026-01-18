@@ -425,6 +425,7 @@
                 files={sendFiles}
                 label={`Send Directory`} 
                 bind:locked={sendLocked}
+                selectedIndex={-1}
                 lockIcon={LockIcon}
                 unlockIcon={LockOpenIcon}
                 onGoBack={async () => await goDirBack(true)}
@@ -506,6 +507,7 @@
                 files={recvFiles} 
                 label={`Receive Directory`} 
                 bind:locked={recvLocked}
+                selectedIndex={-1}
                 lockIcon={LockIcon}
                 unlockIcon={LockOpenIcon}
                 onGoBack={async () => await goDirBack(false)}

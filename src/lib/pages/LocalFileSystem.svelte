@@ -328,6 +328,7 @@
             files={sourceFiles} 
             label={`Source Directory${sourceWatch ? " (Watching)" : ""}`} 
             bind:locked={sourceWatch}
+            selectedIndex={-1}
             lockIcon={ScanEyeIcon}
             unlockIcon={EyeOffIcon}
             onGoBack={async () => await goDirBack(true) }
@@ -350,6 +351,7 @@
             files={destFiles} 
             label={`Destination Directory${destLocked ? " (Locked)" : ""}`} 
             bind:locked={destLocked}
+            selectedIndex={-1}
             lockIcon={LockIcon}
             unlockIcon={LockOpenIcon}
             onGoBack={() => goDirBack(false) }

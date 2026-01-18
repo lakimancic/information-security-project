@@ -13,6 +13,7 @@
 		pwd = $bindable(''),
 		label,
 		locked = $bindable(false),
+		selectedIndex = $bindable(-1),
 		lockIcon : LockIcon,
 		unlockIcon : UnlockIcon,
 		constFilter,
@@ -33,6 +34,7 @@
 		pwd: string;
 		label: string;
 		locked: boolean;
+		selectedIndex: number;
 		lockIcon: Component<IconProps, {}>;
 		unlockIcon: Component<IconProps, {}>;
 		constFilter?: RegExp;
@@ -70,7 +72,7 @@
 		{ title: "Type", sortKey: "type" },
 	];
 
-	let selectedIndex = $state(-1);
+	// let selectedIndex = $state(-1);
 	let rowEls = $state<{ [key: number]: HTMLDivElement | null }>({});
 
 	const filesWithBack = $derived.by(() => {
