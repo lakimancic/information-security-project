@@ -11,7 +11,8 @@ pub mod hash_wrappers;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
-use tauri::Listener;
+use tracing_subscriber::{fmt, prelude::*};
+use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use crate::crypto::commands::{decrypt_file, encrypt_file, stop_processing};
 use crate::files::commands::{change_dir, get_files, go_dir_back, set_current_dir};
 use crate::files::commands::{start_file_watching, stop_file_watching};
@@ -38,9 +39,32 @@ pub struct AppState {
     watcher: WatcherState
 }
 
+fn init_tracing() {
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let file_appender =
+        RollingFileAppender::new(Rotation::NEVER, "logs", &format!("app-{}.log", today));
+    let (non_blocking_file, _guard) = tracing_appender::non_blocking(file_appender);
+
+    let stdout_layer = fmt::layer()
+        .with_writer(std::io::stdout)
+        .with_timer(fmt::time::LocalTime::rfc_3339())
+        .with_ansi(true);
+
+    let file_layer = fmt::layer()
+        .with_writer(non_blocking_file)
+        .with_timer(fmt::time::LocalTime::rfc_3339());
+
+    tracing_subscriber::registry()
+        .with(stdout_layer)
+        .with(file_layer)
+        .init();
+}
+
 #[allow(clippy::missing_panics_doc)]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    init_tracing();
+
     tauri::Builder::default()
         .manage(AppState {
             source_explorer: Mutex::new(FileExplorer::new()),
@@ -54,14 +78,7 @@ pub fn run() {
             watcher: Arc::new(Mutex::new(None)),
             net_keys: Arc::new(Mutex::new(HashMap::new()))
         })
-        .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+        .setup(|_app| {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

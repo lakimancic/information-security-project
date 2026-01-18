@@ -1,8 +1,8 @@
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use tauri::Emitter;
 use crate::progress::{CryptoProgress, ProgressWriter};
 use crate::crypto::{CryptoMetadata, CryptoRequest};
@@ -54,7 +54,7 @@ where
         let _ = std::fs::remove_file(&tmp_file_path);
         return Err(std::io::Error::new(
             std::io::ErrorKind::Interrupted,
-            "Encryption cancelled",
+            "Action cancelled",
         )
             .into());
     }
@@ -78,6 +78,8 @@ pub fn encrypt_worker(
     cancel: Arc<AtomicBool>,
 ) -> Result<(), CryptoError> {
     use std::fs::File;
+
+    tracing::debug!("Started encrypting file {}", input_file.display());
 
     let input = File::open(input_file)?;
     let total = input.metadata()?.len() as usize;
@@ -115,7 +117,7 @@ pub fn encrypt_worker(
         total,
     })?;
 
-    run_crypto_job(
+    match run_crypto_job(
         app,
         output_file,
         total,
@@ -130,7 +132,16 @@ pub fn encrypt_worker(
             let mut encryptor = Encryptor::new(request.clone())?;
             encryptor.encrypt(input, writer)
         },
-    )
+    ) {
+        Ok(_) => {
+            tracing::info!("File successfully encrypted: {}", output_file.display());
+            Ok(())
+        },
+        Err(e) => {
+            tracing::error!("Encryption failed for file: {}", input_file.display());
+            Err(e)
+        },
+    }
 }
 
 pub fn decrypt_worker(
@@ -141,6 +152,8 @@ pub fn decrypt_worker(
     cancel: Arc<AtomicBool>,
 ) -> Result<(), CryptoError> {
     use std::fs::File;
+
+    tracing::debug!("Started decrypting file {}", input_file.display());
 
     let input = File::open(input_file)?;
     let output_str = output_file
@@ -168,7 +181,7 @@ pub fn decrypt_worker(
 
     let total = metadata.size;
 
-    run_crypto_job(
+    match run_crypto_job(
         app,
         output_file,
         total,
@@ -178,5 +191,14 @@ pub fn decrypt_worker(
             let mut encryptor = Encryptor::new(request)?;
             encryptor.decrypt(buffered_input, writer)
         },
-    )
+    ) {
+        Ok(_) => {
+            tracing::info!("File successfully decrypted: {}", output_file.display());
+            Ok(())
+        },
+        Err(e) => {
+            tracing::error!("Encryption failed for file: {}", input_file.display());
+            Err(e)
+        },
+    }
 }

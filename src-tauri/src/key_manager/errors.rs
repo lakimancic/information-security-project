@@ -3,9 +3,6 @@ use crate::crypto::errors::CryptoError;
 
 #[derive(Error, Debug)]
 pub enum KeysError {
-    #[error("Failed to generate new key (and IV)")]
-    GenerateKeyError,
-
     #[error("Key with name '{0}' already exists")]
     KeyAlreadyExists(String),
 
@@ -35,7 +32,6 @@ pub enum KeysError {
 #[serde(tag = "name", content = "message")]
 #[serde(rename_all = "camelCase")]
 enum KeysErrorName {
-    GenerateKeyError(String),
     KeyAlreadyExists(String),
     KeyNotFound(String),
     InvalidPassword(String),
@@ -54,7 +50,6 @@ impl serde::Serialize for KeysError {
         let message = self.to_string();
 
         let name = match self {
-            Self::GenerateKeyError => KeysErrorName::GenerateKeyError(message),
             Self::KeyAlreadyExists(_) => KeysErrorName::KeyAlreadyExists(message),
             Self::KeyNotFound(_) => KeysErrorName::KeyNotFound(message),
             Self::InvalidPassword => KeysErrorName::InvalidPassword(message),

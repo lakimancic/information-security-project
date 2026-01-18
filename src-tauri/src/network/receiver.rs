@@ -91,6 +91,7 @@ fn recv_worker(
         sock_addr: addr,
         size: metadata.size,
     })?;
+    tracing::info!("Receiving file {} from: {}", metadata.filename, addr);
 
     let (lock, cvar) = &*registry;
     let mut map = lock.lock().unwrap();
@@ -101,6 +102,7 @@ fn recv_worker(
 
     if map[&addr].canceled {
         app.emit("network:recv:denied", addr)?;
+        tracing::info!("Receiving file {} denied.", metadata.filename);
         return Ok(());
     }
 
@@ -117,7 +119,16 @@ fn recv_worker(
         iv: key.iv.clone(),
     };
 
-    recv_decrypt_worker(app, &output_path, metadata.filename, metadata.size, request, &mut reader, metadata.hash_algo, cancel)
+    match recv_decrypt_worker(app, &output_path, metadata.filename, metadata.size, request, &mut reader, metadata.hash_algo, cancel) {
+        Ok(_) => {
+            tracing::info!("Received file successfully decrypted: {}", output_path.display());
+            Ok(())
+        }
+        Err(err) => {
+            tracing::error!("Receiving file failed: {}", output_path.display());
+            Err(err)
+        }
+    }
 }
 
 fn recv_decrypt_worker(
@@ -126,7 +137,7 @@ fn recv_decrypt_worker(
     filename: String,
     total: usize,
     request: CryptoRequest,
-    mut buffered_reader: &mut BufReader<&TcpStream>,
+    buffered_reader: &mut BufReader<&TcpStream>,
     hash_algo: Option<String>,
     cancel: Arc<AtomicBool>,
 ) -> Result<(), NetworkError> {
@@ -178,6 +189,7 @@ fn recv_decrypt_worker(
             buffered_reader.read_exact(&mut expected_hash)?;
 
             if expected_hash != real_hash {
+                tracing::warn!("Hash verification failed");
                 return Err(NetworkError::HashVerificationFailed);
             }
         }

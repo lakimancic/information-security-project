@@ -103,11 +103,6 @@ fn try_start_job(
 pub fn handle_event(
     event: notify::Event,
     pending: &mut PendingMap,
-    watch_path: &Path,
-    output_path: &Path,
-    jobs: &JobRegistry,
-    app: &tauri::AppHandle,
-    mode: &WatchMode,
 ) {
     use notify::EventKind;
 
@@ -145,6 +140,7 @@ pub fn process_pending(
 
     for path in ready {
         if is_stable(&path).unwrap_or(false) {
+            tracing::info!("FSW detected new file: {}", path.display());
             try_start_job(
                 path,
                 watch_path,

@@ -1,7 +1,6 @@
-use std::cmp::min;
 use std::io::{Read, Write};
 use std::ops::Deref;
-use crate::crypto::{padding, CipherInstance, CryptoRequest};
+use crate::crypto::{CipherInstance, CryptoRequest};
 use crate::crypto::cipher_factory::CipherFactory;
 use crate::crypto::errors::CryptoError;
 
@@ -160,7 +159,7 @@ impl Encryptor {
     }
 
     pub fn padded_size(&self, size: usize) -> u64 {
-        if let CipherInstance::Block { ref cipher, ref mode, ref padding } = self.cipher {
+        if let CipherInstance::Block { ref cipher, mode: _, ref padding } = self.cipher {
             padding.pad_size(size, cipher.block_size()) as u64
         }
         else {

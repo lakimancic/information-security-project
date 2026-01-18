@@ -9,6 +9,7 @@
     import { listen } from "@tauri-apps/api/event";
 	import { onMount } from "svelte";
     import { SvelteMap } from "svelte/reactivity";
+    import { notify } from "$lib/components/ui/notifications/store";
 
     let sourceFiles: LocalFile[] = $state([]);
     let sourceCwd: string = $state('');
@@ -318,6 +319,7 @@
     </div>
     <button
         class="bg-primary hover:bg-primary/60 text-bg-0 dark:text-fg-0 px-4 py-3 rounded-sm ml-3 cursor-pointer transition-colors duration-300"
+        onclick={() => notify.success("Lorem ipsum lorem psuim pola hola vola dola abra kada bra sala mala", 3000)}
     >{operation === 'enc' ? 'Encrypt' : 'Decrypt'}</button>
 </div>
 <div class="flex flex-1 min-h-0">
@@ -328,7 +330,7 @@
             files={sourceFiles} 
             label={`Source Directory${sourceWatch ? " (Watching)" : ""}`} 
             bind:locked={sourceWatch}
-            selectedIndex={-1}
+            selectedFile={null}
             lockIcon={ScanEyeIcon}
             unlockIcon={EyeOffIcon}
             onGoBack={async () => await goDirBack(true) }
@@ -351,7 +353,7 @@
             files={destFiles} 
             label={`Destination Directory${destLocked ? " (Locked)" : ""}`} 
             bind:locked={destLocked}
-            selectedIndex={-1}
+            selectedFile={null}
             lockIcon={LockIcon}
             unlockIcon={LockOpenIcon}
             onGoBack={() => goDirBack(false) }

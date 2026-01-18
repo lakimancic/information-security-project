@@ -13,7 +13,7 @@
 		pwd = $bindable(''),
 		label,
 		locked = $bindable(false),
-		selectedIndex = $bindable(-1),
+		selectedFile = $bindable(null),
 		lockIcon : LockIcon,
 		unlockIcon : UnlockIcon,
 		constFilter,
@@ -34,7 +34,7 @@
 		pwd: string;
 		label: string;
 		locked: boolean;
-		selectedIndex: number;
+		selectedFile: LocalFile|null;
 		lockIcon: Component<IconProps, {}>;
 		unlockIcon: Component<IconProps, {}>;
 		constFilter?: RegExp;
@@ -59,6 +59,8 @@
 	let pwdBar : HTMLInputElement;
 	let itemsMenu : HTMLDivElement;
 
+	let selectedIndex = $state(-1);
+
 	type SortColumn = 'name'|'date'|'size'|'type';
 	let sortBy = writable<SortColumn>('name');
 	let sortDirection = writable<'asc'|'desc'>('asc');
@@ -72,8 +74,15 @@
 		{ title: "Type", sortKey: "type" },
 	];
 
-	// let selectedIndex = $state(-1);
 	let rowEls = $state<{ [key: number]: HTMLDivElement | null }>({});
+
+	$effect(() => {
+		if (selectedIndex !== -1 && selectedIndex < filesWithBack.length) {
+			selectedFile = filesWithBack[selectedIndex];
+		} else {
+			selectedFile = null;
+		}
+	});
 
 	const filesWithBack = $derived.by(() => {
 		const filesCopy = files.toSorted((a, b) => {

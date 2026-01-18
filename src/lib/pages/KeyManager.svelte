@@ -26,6 +26,8 @@
 
     let keys: ShortKey[] = $state([]);
 
+    let selectedFile : LocalFile|null = $state(null);
+
     const triggerContent = $derived(
         streamCiphers.find(c => c.value === algoStr)?.label ??
         blockCiphers.find(c => c.value === algoStr)?.label ?? "Select Cipher"
@@ -59,8 +61,10 @@
             });
     };
 
-    const loadKeys = async (filename: string) => {
-        await invoke('load_keys', { filename })
+    const loadKeys = async () => {
+        if (!selectedFile) return;
+
+        await invoke('load_keys', { filename: selectedFile.filename })
         .then(() => {
             listKeys();
         })
@@ -133,7 +137,7 @@
             files={files} 
             label="Look for Keys in directory" 
             locked={filesLocked}
-            selectedIndex={-1}
+            bind:selectedFile={selectedFile}
             lockIcon={LockIcon}
             unlockIcon={LockOpenIcon}
             onGoBack={async () => await goDirBack() }
@@ -153,6 +157,7 @@
         <div class="flex justify-around gap-5 py-5">
             <button class="flex px-4 py-3 gap-3 text-xl items-center bg-primary hover:bg-primary/60 cursor-pointer rounded-md
                 transition-all duration-200 text-bg-0 dark:text-fg-0"
+                onclick={() => loadKeys()}
             >
                 Load Keys <FolderOpenIcon />
             </button>

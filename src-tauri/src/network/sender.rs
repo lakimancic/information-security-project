@@ -77,6 +77,8 @@ fn send_worker(
 ) -> Result<(), NetworkError> {
     use std::fs::File;
 
+    tracing::info!("Sending file {} to {}", input_file.display(), addr);
+
     let input = File::open(input_file)?;
     let total = input.metadata()?.len() as usize;
 
@@ -152,12 +154,12 @@ fn send_worker(
             total,
         },
     );
+    tracing::info!("File successfully sent: {}", input_file.display());
 
     Ok(())
 }
 
 pub fn try_send_key(
-    app: tauri::AppHandle,
     addr: &SocketAddr,
     key: &PlainKey
 ) -> Result<(), NetworkError> {
@@ -177,5 +179,7 @@ pub fn try_send_key(
     else {
         buf_writer.write_all(&0u16.to_le_bytes())?;
     }
+
+    tracing::info!("Key successfully sent to: {}", addr);
     Ok(())
 }

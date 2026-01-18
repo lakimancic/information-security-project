@@ -8,7 +8,6 @@ use tauri::Emitter;
 use crate::AppState;
 use crate::crypto::CryptoRequest;
 use crate::crypto::errors::CryptoError;
-use crate::jobs::ListenerControl;
 use crate::key_manager::key::PlainKey;
 use crate::network::errors::NetworkError;
 use crate::network::receiver::{read_key_from_stream, spawn_recv_worker};
@@ -51,7 +50,6 @@ pub async fn stop_sending(
 
 #[tauri::command]
 pub async fn send_key(
-    app: tauri::AppHandle,
     key: PlainKey,
     ip: String,
     port: u16,
@@ -59,7 +57,7 @@ pub async fn send_key(
     let ip_addr = ip.parse::<IpAddr>()?;
     let socket_addr = SocketAddr::new(ip_addr, port);
 
-    try_send_key(app, &socket_addr, &key)
+    try_send_key(&socket_addr, &key)
 }
 
 #[tauri::command]
@@ -217,6 +215,7 @@ pub fn start_key_listening(
                                 map.insert(addr.ip(), key.clone());
                             }
 
+                            tracing::info!("Received key from: {}", addr);
                             let _ = app.emit("network:key:saved", addr.to_string());
                         }
                         Err(err) => {

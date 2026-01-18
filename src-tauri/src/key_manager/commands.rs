@@ -1,4 +1,3 @@
-use std::error::Error;
 use crate::AppState;
 use crate::key_manager::errors::KeysError;
 use crate::key_manager::key::{PlainKey, ShortKey};

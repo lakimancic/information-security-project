@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CryptoError {

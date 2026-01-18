@@ -42,15 +42,7 @@ pub fn start_watcher(
 
         while !stop_thread.load(Ordering::SeqCst) {
             match rx.recv_timeout(Duration::from_millis(200)) {
-                Ok(Ok(event)) => handle_event(
-                    event,
-                    &mut pending,
-                    &watch_path,
-                    &output_path,
-                    &jobs,
-                    &app,
-                    &mode,
-                ),
+                Ok(Ok(event)) => handle_event(event, &mut pending),
                 _ => {}
             }
 
@@ -65,6 +57,7 @@ pub fn start_watcher(
         }
     });
 
+    tracing::info!("File System Watcher started");
     WatcherService { stop, handle }
 }
 

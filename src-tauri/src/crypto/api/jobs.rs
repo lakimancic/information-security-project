@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}, thread};
+use std::{sync::{Arc}, thread};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool};
 use tauri::Emitter;

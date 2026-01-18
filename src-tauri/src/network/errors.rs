@@ -1,7 +1,6 @@
 use std::net::AddrParseError;
 use thiserror::Error;
 use crate::crypto::errors::CryptoError;
-use crate::key_manager::errors::KeysError;
 
 #[derive(Error, Debug)]
 pub enum NetworkError {

@@ -8,10 +8,12 @@
 	import LocalFileSystem from '$lib/pages/LocalFileSystem.svelte';
 	import NetworkTransfer from '$lib/pages/NetworkTransfer.svelte';
 	import KeyManager from '$lib/pages/KeyManager.svelte';
+	import Notifications from '$lib/components/ui/notifications/Notifications.svelte';
 </script>
 
-<main class="h-screen text-fg-0 flex overflow-hidden">
+<main class="h-screen text-fg-0 flex overflow-hidden relative">
 	<Background />
+	<Notifications />
 	{#if route.path === '/'}
 		<Welcome />
 	{:else}

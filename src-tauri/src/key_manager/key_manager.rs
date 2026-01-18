@@ -84,7 +84,6 @@ impl KeyManager {
             padding: Box::new(Pkcs7)
         });
 
-        let need_size = encrypted_key.key_size + encrypted_key.iv_size;
         cipher.decrypt(&mut input, &mut output).map_err(|_| KeysError::InvalidPassword)?;
         let plaintext = output.into_inner();
 
@@ -159,9 +158,10 @@ impl KeyManager {
         let file = File::open(&path)?;
         let mut reader = BufReader::new(file);
 
-        let mut magic = [0u8; 7];
+        let mut magic = vec![0u8; 7];
         reader.read_exact(&mut magic)?;
-        if &magic != b"KOXKM\xde\xad" {
+
+        if magic != b"KOXKM\xde\xad" {
             return Err(KeysError::InvalidFormat);
         }
 

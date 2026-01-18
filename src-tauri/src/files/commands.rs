@@ -107,5 +107,7 @@ pub fn stop_file_watching(state: tauri::State<AppState>) {
     if let Some(service) = state.watcher.lock().unwrap().take() {
         service.stop.store(true, Ordering::SeqCst);
         let _ = service.handle.join();
+
+        tracing::info!("File System Watcher stopped");
     }
 }
