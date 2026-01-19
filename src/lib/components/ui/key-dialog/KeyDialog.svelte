@@ -29,6 +29,7 @@
 
     let genName = $state('');
     let genPass = $state('');
+    let genPassRep = $state('');
 
     let currentTab = $state("select-existing");
 
@@ -66,6 +67,21 @@
     };
 
     const handleGenerateKey = async () => {
+        if (genName.length < 3) {
+            errorMsg = 'Key name must be at least 3 characters long';
+            return;
+        }
+
+        if (genPass.length < 3) {
+            errorMsg = 'Password is too short (min 3 characters)';
+            return;
+        }
+
+        if (genPass !== genPassRep) {
+            errorMsg = 'Passwords doesn\'t match';
+            return;
+        }
+
         invoke("generate_new_key", { algorithm: algo?.value ?? '', mode: mode?.value, name: genName, password: genPass })
             .then((res: any) => {
                 outputKey = {
@@ -215,6 +231,7 @@
                         id="confirmPassword"
                         placeholder="confirm_password"
                         class="outline-none border border-bg-5 min-w-40 text-md py-2 px-3 rounded-md w-full mt-2 mb-4 placeholder:text-fg-0/40"
+                        bind:value={genPassRep}
                     />
                     <p class="text-center text-error">{errorMsg}</p>
                     <div class="flex w-full justify-end mt-5">

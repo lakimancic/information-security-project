@@ -457,13 +457,13 @@
                     {#if fileListening}
                         <p>Listening for Key on :{recvPort}...</p>
                         <button 
-                            class="bg-error hover:bg-error/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
+                            class="bg-error hover:bg-error/70 text-bg-0 dark:text-fg-0 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
                             onclick={() => stopListening(false)}
                         >Stop Listening</button>
                     {:else}
                         <p>Listen for Files</p>
                         <button 
-                            class="bg-primary hover:bg-primary/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
+                            class="bg-primary hover:bg-primary/70 text-bg-0 dark:text-fg-0 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
                             onclick={() => listenFor(false)}
                         >Listen for Files</button> 
                     {/if}
@@ -472,13 +472,13 @@
                     {#if keyListening}
                         <p>Listening for Key on :{recvKeyPort}...</p>
                         <button 
-                            class="bg-error hover:bg-error/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
+                            class="bg-error hover:bg-error/70 text-bg-0 dark:text-fg-0 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
                             onclick={() => stopListening(true)}
                         >Stop Listening</button>
                     {:else}
                         <p>Listen for Key</p>
                         <button 
-                            class="bg-primary hover:bg-primary/70 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
+                            class="bg-primary hover:bg-primary/70 text-bg-0 dark:text-fg-0 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
                             onclick={() => listenFor(true)}
                         >Listen for Key</button> 
                     {/if}

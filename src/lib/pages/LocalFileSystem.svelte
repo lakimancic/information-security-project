@@ -29,6 +29,8 @@
     let destLocked = $state(false);
     let sourceWatch = $state(false);
 
+    let selectedFile : LocalFile|null = $state(null);
+
     let algo = $derived.by(() => {
         return [...blockCiphers, ...streamCiphers].find(v => v.value === algoStr) ?? null
     });
@@ -58,6 +60,9 @@
                 destFiles = res.files as LocalFile[];
                 destCwd = res.pwd as string;
             }
+        })
+        .catch(err => {
+            notify.error(err, 3000);
         });
     };
 
@@ -95,7 +100,26 @@
     };
 
     const onFileAction = async (filename: string) => {
-        if (!key) return;
+        if (operation === 'enc') {
+            if (algo === null) {
+                notify.warning("Algorithm is not selected", 3000);
+                return;
+            }
+            else if (algoStr.startsWith("block:") && mode === null) {
+                notify.warning("Block mode is not selected", 3000);
+                return;
+            }
+        }
+
+        if (key === null) {
+            notify.warning("Key is not selected", 3000);
+            return;
+        }
+
+        if (!destLocked) {
+            notify.warning(`Before ${operation === 'enc' ? 'encryption' : 'decryption'} destination directory must be locked.`, 3000);
+            return;
+        }
 
         let invoker;
         if (operation === 'enc') {
@@ -121,9 +145,11 @@
         }
 
         invoker
-        .then(() => {})
+        .then(() => {
+            loadFiles(false, false);
+        })
         .catch(err => {
-            console.error(err);
+            notify.error(err, 3000);
         });
     };
 
@@ -137,7 +163,7 @@
             }
         })
         .catch(err => {
-            console.error(err);
+            notify.error(err, 3000);
         })
     };
 
@@ -174,7 +200,7 @@
                 return true;
             }
             catch(err: any) {
-                console.error(err);
+                notify.error(err, 3000);
                 return false;
             }
         }
@@ -229,12 +255,12 @@
                 }
             }));
 
-            unlisteners.push(await listen<ProgressFile>("crypto:error", (event) => {
-                console.error(event.payload);
+            unlisteners.push(await listen("crypto:error", (event) => {
+                notify.error((event.payload as any).err, 3000);
             }));
 
-            unlisteners.push(await listen<ProgressFile>("fsw:error", (event) => {
-                console.error(event.payload);
+            unlisteners.push(await listen("fsw:error", (event) => {
+                notify.error(event.payload as string, 3000);
             }));
         };
 
@@ -309,17 +335,18 @@
     <p class="mr-2">Operation:</p>
     <div class="flex border border-bg-4 p-1 rounded-sm gap-2">
         <button 
-            class="border-2 {operation === 'dec' ? 'border-bg-4' : 'border-primary'} p-2 rounded-sm cursor-pointer"
-            onclick={() => operation = 'enc'}
+            class="border-2 {operation === 'dec' ? 'border-bg-4' : (processFiles.size > 0 ? 'border-bg-2' : 'border-primary')} p-2 rounded-sm cursor-pointer"
+            onclick={() => processFiles.size === 0 && (operation = 'enc')}
         >Encryption</button>
         <button 
-            class="border-2 {operation === 'enc' ? 'border-bg-4' : 'border-primary'} p-2 rounded-sm cursor-pointer"
-            onclick={() => operation = 'dec'}
+            class="border-2 {operation === 'enc' ? 'border-bg-4' : (processFiles.size > 0 ? 'border-bg-2' : 'border-primary')} p-2 rounded-sm cursor-pointer"
+            onclick={() => processFiles.size === 0 && (operation = 'dec')}
         >Decryption</button>
     </div>
     <button
-        class="bg-primary hover:bg-primary/60 text-bg-0 dark:text-fg-0 px-4 py-3 rounded-sm ml-3 cursor-pointer transition-colors duration-300"
-        onclick={() => notify.success("Lorem ipsum lorem psuim pola hola vola dola abra kada bra sala mala", 3000)}
+        class="bg-primary hover:bg-primary/60 disabled:bg-bg-5 disabled:text-bg-1 dark:disabled:text-fg-3 text-bg-0 dark:text-fg-0 px-4 py-3 rounded-sm ml-3 cursor-pointer transition-colors duration-300"
+        disabled={key === null || selectedFile === null || !destLocked || processFiles.size !== 0}
+        onclick={() => selectedFile && onFileAction(selectedFile.filename)}
     >{operation === 'enc' ? 'Encrypt' : 'Decrypt'}</button>
 </div>
 <div class="flex flex-1 min-h-0">
@@ -330,7 +357,7 @@
             files={sourceFiles} 
             label={`Source Directory${sourceWatch ? " (Watching)" : ""}`} 
             bind:locked={sourceWatch}
-            selectedFile={null}
+            bind:selectedFile={selectedFile}
             lockIcon={ScanEyeIcon}
             unlockIcon={EyeOffIcon}
             onGoBack={async () => await goDirBack(true) }
