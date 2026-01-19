@@ -176,7 +176,6 @@
                 return true;
             }
             catch(err: any) {
-                console.error(err);
                 return false;
             }
         }
@@ -222,6 +221,12 @@
             key = cachedKeys[algoStr + ":" + newMode];
         else
             key = null;
+    };
+
+    const onDestLockChange = async () => {
+        if (processFiles.size === 0)
+            return true;
+        return false;
     };
 
     onMount(() => {
@@ -344,8 +349,9 @@
         >Decryption</button>
     </div>
     <button
-        class="bg-primary hover:bg-primary/60 disabled:bg-bg-5 disabled:text-bg-1 dark:disabled:text-fg-3 text-bg-0 dark:text-fg-0 px-4 py-3 rounded-sm ml-3 cursor-pointer transition-colors duration-300"
-        disabled={key === null || selectedFile === null || !destLocked || processFiles.size !== 0}
+        class="bg-primary hover:bg-primary/60 disabled:bg-bg-5 disabled:text-bg-1 dark:disabled:text-fg-3 
+        text-bg-0 dark:text-fg-0 px-4 py-3 rounded-sm ml-3 cursor-pointer transition-colors duration-300"
+        disabled={key === null || selectedFile === null || !destLocked || sourceWatch || processFiles.size !== 0}
         onclick={() => selectedFile && onFileAction(selectedFile.filename)}
     >{operation === 'enc' ? 'Encrypt' : 'Decrypt'}</button>
 </div>
@@ -388,7 +394,7 @@
             onFileAction={() => {}}
             onStopProcessingFile={stopFileEncryption}
             onSetAbsolutePath={async newDir => await setAbsolutePath(newDir, false)}
-            onLockChange={async () => true}
+            onLockChange={onDestLockChange}
             onRefresh={() => loadFiles(false)}
             constFilter={operation === 'enc' ? /^.*\.enc$/ : undefined}
             processingFiles={processFilesArray}

@@ -181,13 +181,12 @@ pub fn start_key_listening(
     port: u16,
 ) -> Result<(), NetworkError> {
     let listener = TcpListener::bind(("0.0.0.0", port))?;
-    let stop_flag = Arc::new(AtomicBool::new(false));
-
-    {
+    let stop_flag = {
         let mut ctrl = state.key_listener.lock()
             .map_err(|err| NetworkError::NetworkInternalError(err.to_string()))?;
         ctrl.stop = Arc::new(AtomicBool::new(false));
-    }
+        ctrl.stop.clone()
+    };
 
     let thread_stop = stop_flag.clone();
     let net_keys = state.net_keys.clone();

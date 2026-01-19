@@ -1,6 +1,7 @@
 <script lang="ts">
     import FileExplorer from "$lib/components/ui/file-explorer/FileExplorer.svelte";
 	import type { LocalFile } from "$lib/components/ui/file-explorer/utils";
+	import { notify } from "$lib/components/ui/notifications/store";
     import * as Select from "$lib/components/ui/select/index";
 	import { blockCiphers, blockModes, streamCiphers, type ShortKey } from "$lib/types/crypto";
 	import { sizesToAlgorithm } from "$lib/utils/crypto";
@@ -69,7 +70,7 @@
             listKeys();
         })
         .catch(err => {
-            console.error(err);
+            notify.error(err, 3000);
         });
     };
 
@@ -86,7 +87,7 @@
 
         })
         .catch(err => {
-            console.error(err);
+            notify.error(err, 3000);
         })
     };
 

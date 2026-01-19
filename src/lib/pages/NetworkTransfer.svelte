@@ -9,6 +9,7 @@
 	import { invoke } from "@tauri-apps/api/core";
 	import { onMount } from "svelte";
 	import { listen } from "@tauri-apps/api/event";
+	import { notify } from "$lib/components/ui/notifications/store";
 
     let sendFiles: LocalFile[] = $state([]);
     let sendCwd: string = $state('');
@@ -37,6 +38,8 @@
 
     let recvLocked = $state(false);
     let sendLocked = $state(false);
+
+    let selectedFile : LocalFile|null = $state(null);
 
     let fileListening = $state(false);
     let keyListening = $state(false);
@@ -151,7 +154,7 @@
 
         })
         .catch(err => {
-            console.error(err);
+            notify.error(err, 3000);
         });
     };
 
@@ -167,7 +170,7 @@
             port: sendPort
         })
         .catch(err => {
-            console.error(err)
+            notify.error(err, 3000);
         });
     };
 
@@ -185,15 +188,16 @@
         const listening = files ? fileListening : keyListening;
         if (listening) return;
 
-        invoke(files ? 'start_file_listening' : 'start_key_listening', {
-            port: files ? recvPort : recvKeyPort
+        const command = files ? 'start_file_listening' : 'start_key_listening';
+        invoke(command, {
+            port: (files ? recvPort : recvKeyPort)
         })
         .then(() => {
             if (files) fileListening = true;
             else keyListening = true;
         })
         .catch(err => {
-            console.error(err);
+            notify.error(err, 3000);
         });
     };
 
@@ -207,7 +211,7 @@
             else keyListening = false;
         })
         .catch(err => {
-            console.error(err);
+            notify.error(err, 3000);
         });
     };
     
@@ -215,7 +219,7 @@
         invoke(accept ? 'approve_incoming' : 'deny_incoming', { addr: sockAddr })
         .then(() => {})
         .catch(err => {
-            console.error(err);
+            notify.error(err, 3000);
         });
     };
 
@@ -257,10 +261,12 @@
 
             unlisteners.push(await listen<ProgressFile>("network:error", (event) => {
                 console.error(event.payload);
+                notify.error(event.payload as any, 3000);
             }));
 
             unlisteners.push(await listen("network:recv:error", (event) => {
                 console.error(event.payload);
+                notify.error(event.payload as any, 3000);
             }));
 
             unlisteners.push(await listen<PendingFile>("network:recv:pending", (event) => {
@@ -401,21 +407,21 @@
             <p>Port:</p>
             <input type="number" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
             outline-none border border-bg-5 data-[placeholder]:text-fg-3 w-40 py-1 px-3 rounded-md" placeholder="443" bind:value={sendPort} />
-            <button>
-                <LockIcon class="bg-bg-3 hover:bg-bg-4 rounded-md p-2 size-10 mr-5 cursor-pointer text-fg-2" />
-            </button>
         </div>
         <div class="w-full flex flex-wrap items-center px-5 py-1">
             <p class="">Key:</p>
             <p class="mx-2 {key !== null ? "text-primary font-black" : "text-fg-4"}">{key?.label ?? "No key selected"}</p>
             <KeyDialog algo={algo} mode={mode} bind:outputKey={key} onKeySet={onKeySet} operation={'enc'} />
             <button
+                disabled={key === null}
                 onclick={onKeyAction}
-                class="bg-primary hover:bg-primary/60 text-bg-0 dark:text-fg-0 px-4 py-2 rounded-sm ml-3 cursor-pointer transition-colors duration-300"
+                class="bg-primary hover:bg-primary/60 disabled:bg-bg-5 disabled:text-bg-1 dark:disabled:text-fg-3 
+                text-bg-0 dark:text-fg-0 px-4 py-3 rounded-sm ml-3 cursor-pointer transition-colors duration-300"
             >Send Key</button>
             <button
-                class="bg-primary hover:bg-primary/60 text-bg-0 dark:text-fg-0 px-7 py-2 
-                flex gap-2 rounded-sm ml-auto cursor-pointer transition-colors duration-300"
+                disabled={key === null || selectedFile === null || sendingFiles.size !== 0}
+                class="bg-primary hover:bg-primary/60 text-bg-0 dark:text-fg-0 px-7 py-2 disabled:bg-bg-5 disabled:text-bg-1
+                dark:disabled:text-fg-3 flex gap-2 rounded-sm ml-auto cursor-pointer transition-colors duration-300"
             ><HardDriveUploadIcon /> Send File</button>
         </div>
         <div class="flex-1 min-h-0">
@@ -425,7 +431,7 @@
                 files={sendFiles}
                 label={`Send Directory`} 
                 bind:locked={sendLocked}
-                selectedFile={null}
+                bind:selectedFile={selectedFile}
                 lockIcon={LockIcon}
                 unlockIcon={LockOpenIcon}
                 onGoBack={async () => await goDirBack(true)}
@@ -446,10 +452,10 @@
         <div class="w-full flex flex-wrap items-center px-5 py-1 gap-3">
             <p>File Listen Port:</p>
             <input type="number" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
-            outline-none border border-bg-5 data-[placeholder]:text-fg-3 w-40 py-1 px-3 rounded-md" placeholder="443" bind:value={recvPort} />
+            outline-none border border-bg-5 data-[placeholder]:text-fg-3 disabled:text-fg-2 w-40 py-1 px-3 rounded-md" disabled={fileListening} placeholder="443" bind:value={recvPort} />
             <p>Key Listen Port:</p>
             <input type="number" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
-            outline-none border border-bg-5 data-[placeholder]:text-fg-3 w-40 py-1 px-3 rounded-md" placeholder="443" bind:value={recvKeyPort} />
+            outline-none border border-bg-5 data-[placeholder]:text-fg-3 disabled:text-fg-2 w-40 py-1 px-3 rounded-md" disabled={keyListening} placeholder="443" bind:value={recvKeyPort} />
         </div>
         <div class="w-full grid grid-cols-3">
             <div class="grid grid-rows-2">
@@ -458,13 +464,15 @@
                         <p>Listening for Key on :{recvPort}...</p>
                         <button 
                             class="bg-error hover:bg-error/70 text-bg-0 dark:text-fg-0 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
-                            onclick={() => stopListening(false)}
+                            onclick={() => stopListening(true)}
                         >Stop Listening</button>
                     {:else}
                         <p>Listen for Files</p>
                         <button 
-                            class="bg-primary hover:bg-primary/70 text-bg-0 dark:text-fg-0 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
-                            onclick={() => listenFor(false)}
+                            disabled={Number.isNaN(parseInt(recvPort))}
+                            class="bg-primary hover:bg-primary/70 disabled:bg-bg-5 text-bg-0 dark:text-fg-0 disabled:dark:text-fg-3
+                            disabled:text-bg-3 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
+                            onclick={() => listenFor(true)}
                         >Listen for Files</button> 
                     {/if}
                 </div>
@@ -473,13 +481,15 @@
                         <p>Listening for Key on :{recvKeyPort}...</p>
                         <button 
                             class="bg-error hover:bg-error/70 text-bg-0 dark:text-fg-0 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
-                            onclick={() => stopListening(true)}
+                            onclick={() => stopListening(false)}
                         >Stop Listening</button>
                     {:else}
                         <p>Listen for Key</p>
                         <button 
-                            class="bg-primary hover:bg-primary/70 text-bg-0 dark:text-fg-0 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
-                            onclick={() => listenFor(true)}
+                            disabled={Number.isNaN(parseInt(recvKeyPort))}
+                            class="bg-primary hover:bg-primary/70 disabled:bg-bg-5 text-bg-0 dark:text-fg-0 disabled:dark:text-fg-3
+                            disabled:text-bg-3 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
+                            onclick={() => listenFor(false)}
                         >Listen for Key</button> 
                     {/if}
                 </div>
