@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::fs;
-use std::os::unix::fs::MetadataExt;
 use chrono::{DateTime, Local};
 use crate::files::errors::FilesError;
 use crate::files::errors::FilesError::InvalidFilename;
@@ -84,7 +83,7 @@ impl FileExplorer {
 
                 entries.push(FileEntry {
                     filename,
-                    size: Some(metadata.size()),
+                    size: Some(metadata.len()),
                     last_modified,
                     file_type,
                     type_long,
