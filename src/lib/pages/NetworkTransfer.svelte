@@ -2,7 +2,7 @@
 	import FileExplorer from "$lib/components/ui/file-explorer/FileExplorer.svelte";
     import { HardDriveUploadIcon, LockIcon, LockOpenIcon, XCircleIcon } from "@lucide/svelte";
     import * as Select from "$lib/components/ui/select/index";
-	import { blockCiphers, blockModes, hashModes, streamCiphers, type Key } from "$lib/types/crypto";
+	import { blockCiphers, blockModes, type CryptoError, hashModes, streamCiphers, type Key } from "$lib/types/crypto";
 	import KeyDialog from "$lib/components/ui/key-dialog/KeyDialog.svelte";
 	import type { LocalFile, PendingFile, ProgressFile } from "$lib/components/ui/file-explorer/utils";
 	import { SvelteMap } from "svelte/reactivity";
@@ -259,14 +259,16 @@
                 keyListening = false;
             }));
 
-            unlisteners.push(await listen<ProgressFile>("network:error", (event) => {
-                console.error(event.payload);
+            unlisteners.push(await listen("network:error", (event) => {
                 notify.error(event.payload as any, 3000);
             }));
 
-            unlisteners.push(await listen("network:recv:error", (event) => {
-                console.error(event.payload);
-                notify.error(event.payload as any, 3000);
+            unlisteners.push(await listen<CryptoError>("network:recv:error", (event) => {
+                recvQueue = recvQueue.filter(pf => pf.sockAddr !== event.payload.filename);
+                if (receivingFiles.has(event.payload.filename)) {
+                    receivingFiles.delete(event.payload.filename);
+                }
+                notify.error(event.payload.err, 3000);
             }));
 
             unlisteners.push(await listen<PendingFile>("network:recv:pending", (event) => {
@@ -413,13 +415,13 @@
             <p class="mx-2 {key !== null ? "text-primary font-black" : "text-fg-4"}">{key?.label ?? "No key selected"}</p>
             <KeyDialog algo={algo} mode={mode} bind:outputKey={key} onKeySet={onKeySet} operation={'enc'} />
             <button
-                disabled={key === null}
+                disabled={key === null || sendIp.length === 0 || Number.isNaN(parseInt(sendPort))}
                 onclick={onKeyAction}
                 class="bg-primary hover:bg-primary/60 disabled:bg-bg-5 disabled:text-bg-1 dark:disabled:text-fg-3 
                 text-bg-0 dark:text-fg-0 px-4 py-3 rounded-sm ml-3 cursor-pointer transition-colors duration-300"
             >Send Key</button>
             <button
-                disabled={key === null || selectedFile === null || sendingFiles.size !== 0}
+                disabled={key === null || selectedFile === null || sendingFiles.size !== 0 || sendIp.length === 0 || Number.isNaN(parseInt(sendPort))}
                 class="bg-primary hover:bg-primary/60 text-bg-0 dark:text-fg-0 px-7 py-2 disabled:bg-bg-5 disabled:text-bg-1
                 dark:disabled:text-fg-3 flex gap-2 rounded-sm ml-auto cursor-pointer transition-colors duration-300"
             ><HardDriveUploadIcon /> Send File</button>

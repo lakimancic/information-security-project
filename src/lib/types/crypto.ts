@@ -15,6 +15,11 @@ interface ShortKey {
     ivSize: number;
 }
 
+interface CryptoError {
+    filename: string;
+    err: string;
+}
+
 const streamCiphers = [
     { value: "stream:a5/1", label: "A5/1" }
 ];
@@ -32,5 +37,5 @@ const hashModes : CipherTag[] = [
     { value: "blake256", label: "BLAKE-256" }
 ];
 
-export type { Key, CipherTag, ShortKey };
+export type { Key, CipherTag, ShortKey, CryptoError };
 export { streamCiphers, blockCiphers, blockModes, hashModes };

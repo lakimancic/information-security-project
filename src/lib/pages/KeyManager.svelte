@@ -24,6 +24,7 @@
 
     let genName = $state('');
     let genPass = $state('');
+    let genPassRep = $state('');
 
     let keys: ShortKey[] = $state([]);
 
@@ -52,6 +53,31 @@
     };
 
     const handleGenerateKey = async () => {
+        if (algoStr === '') {
+            errorMsg = 'Algorithm is not selected.';
+            return;
+        }
+
+        if (algoStr.startsWith("block:") && modeStr === '') {
+            errorMsg = 'Block mode is not selected.';
+            return;
+        }
+
+        if (genName.length < 3) {
+            errorMsg = 'Key name must be at least 3 characters long';
+            return;
+        }
+
+        if (genPass.length < 3) {
+            errorMsg = 'Password is too short (min 3 characters)';
+            return;
+        }
+
+        if (genPass !== genPassRep) {
+            errorMsg = 'Passwords doesn\'t match';
+            return;
+        }
+
         invoke("generate_new_key", { algorithm: algoStr, mode: modeStr, name: genName, password: genPass })
             .then(() => {
                 listKeys();
@@ -84,7 +110,9 @@
     const saveKeys = async () => {
         await invoke('save_keys', { filename: saveFile })
         .then(() => {
-
+            notify.success(`Keys are saved to file ${saveFile}.keys`, 3000);
+            saveFile = '';
+            loadFiles();
         })
         .catch(err => {
             notify.error(err, 3000);
@@ -157,7 +185,8 @@
     <div class="p-4 flex flex-col gap-2 min-h-0">
         <div class="flex justify-around gap-5 py-5">
             <button class="flex px-4 py-3 gap-3 text-xl items-center bg-primary hover:bg-primary/60 cursor-pointer rounded-md
-                transition-all duration-200 text-bg-0 dark:text-fg-0"
+                transition-all duration-200 text-bg-0 dark:text-fg-0 disabled:bg-bg-5 disabled:text-bg-1 dark:disabled:text-fg-3"
+                disabled={selectedFile === null}
                 onclick={() => loadKeys()}
             >
                 Load Keys <FolderOpenIcon />
@@ -221,6 +250,7 @@
                                 </Select.Content>
                             </Select.Root>
                         </div>
+                        {#if algoStr.startsWith("block:")}
                         <div class="flex items-center gap-4 py-2">
                             <p>Choose block mode:</p>
                             <Select.Root type="single" bind:value={modeStr}>
@@ -243,6 +273,7 @@
                                 </Select.Content>
                             </Select.Root>
                         </div>
+                        {/if}
                         <div class="flex items-center gap-4 py-2">
                             <p>Enter new key name:</p>
                             <input 
@@ -273,6 +304,7 @@
                                 id="confirmPassword"
                                 placeholder="confirm_password"
                                 class="outline-none border border-bg-5 min-w-40 py-1.5 px-3 rounded-md placeholder:text-fg-0/40"
+                                bind:value={genPassRep}
                             />
                         </div>
                         <p class="text-center text-error">{errorMsg}</p>
@@ -286,7 +318,8 @@
                 </Dialog.Portal>
             </Dialog.Root>
             <button class="flex px-4 py-3 gap-3 text-xl items-center bg-primary hover:bg-primary/60 cursor-pointer rounded-md
-                transition-all duration-200 text-bg-0 dark:text-fg-0"
+                transition-all duration-200 text-bg-0 dark:text-fg-0 disabled:bg-bg-5 disabled:text-bg-1 dark:disabled:text-fg-3"
+                disabled={saveFile.length === 0}
                 onclick={saveKeys}
             >
                 Save Keys <SaveAllIcon />

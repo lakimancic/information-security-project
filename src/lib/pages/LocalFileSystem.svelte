@@ -3,7 +3,7 @@
 	import type { LocalFile, ProgressFile } from "$lib/components/ui/file-explorer/utils";
 	import KeyDialog from "$lib/components/ui/key-dialog/KeyDialog.svelte";
 	import * as Select from "$lib/components/ui/select/index";
-	import { blockCiphers, blockModes, streamCiphers, type Key } from "$lib/types/crypto";
+	import { blockCiphers, blockModes, type CryptoError, streamCiphers, type Key } from "$lib/types/crypto";
 	import { EyeOffIcon, LockIcon, LockOpenIcon, ScanEyeIcon } from "@lucide/svelte";
     import { invoke } from '@tauri-apps/api/core';
     import { listen } from "@tauri-apps/api/event";
@@ -260,8 +260,9 @@
                 }
             }));
 
-            unlisteners.push(await listen("crypto:error", (event) => {
-                notify.error((event.payload as any).err, 3000);
+            unlisteners.push(await listen<CryptoError>("crypto:error", (event) => {
+                notify.error(event.payload.err, 3000);
+                processFiles.delete(event.payload.filename);
             }));
 
             unlisteners.push(await listen("fsw:error", (event) => {
