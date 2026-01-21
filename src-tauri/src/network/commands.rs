@@ -30,7 +30,13 @@ pub async fn send_file(
 
     let source_path = source_explorer.get_current_path_buf();
 
-    try_start_encrypt_send(app, jobs, source_path, request, file, hash_algo, ip, port)
+    match try_start_encrypt_send(app, jobs, source_path, request, file, hash_algo, ip, port) {
+        Ok(res) => Ok(res),
+        Err(e) => {
+            tracing::error!("Error sending file: {}", e.to_string());
+            Err(e)
+        }
+    }
 }
 
 #[tauri::command]
@@ -57,7 +63,13 @@ pub async fn send_key(
     let ip_addr = ip.parse::<IpAddr>()?;
     let socket_addr = SocketAddr::new(ip_addr, port);
 
-    try_send_key(&socket_addr, &key)
+    match try_send_key(&socket_addr, &key) {
+        Ok(res) => Ok(res),
+        Err(e) => {
+            tracing::error!("Error sending key: {}", e.to_string());
+            Err(e)
+        }
+    }
 }
 
 #[tauri::command]
@@ -86,7 +98,7 @@ pub fn start_file_listening(
     let net_keys = state.net_keys.clone();
 
     thread::spawn(move || {
-        match listener.set_nonblocking(true) {
+        match listener.set_nonblocking(false) {
             Ok(_) => {}
             Err(_) => {
                 let _ = app.emit("network:error", NetworkError::NetworkInternalError("Failed to start file listener".into()).to_string() );
@@ -149,7 +161,6 @@ pub fn approve_incoming(
     }
 
     cvar.notify_all();
-
     Ok(())
 }
 
@@ -192,7 +203,7 @@ pub fn start_key_listening(
     let net_keys = state.net_keys.clone();
 
     thread::spawn(move || {
-        match listener.set_nonblocking(true) {
+        match listener.set_nonblocking(false) {
             Ok(_) => {}
             Err(_) => {
                 let _ = app.emit("network:error", NetworkError::NetworkInternalError("Failed to start key listener".into()).to_string() );

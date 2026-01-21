@@ -153,8 +153,8 @@
         .then(() => {
 
         })
-        .catch(err => {
-            notify.error(err, 3000);
+        .catch((err: any) => {
+            notify.error(err.message, 3000);
         });
     };
 
@@ -169,8 +169,8 @@
             ip: sendIp,
             port: sendPort
         })
-        .catch(err => {
-            notify.error(err, 3000);
+        .catch((err: any) => {
+            notify.error(err.message, 3000);
         });
     };
 
@@ -252,6 +252,13 @@
                         size: event.payload.total
                     });
                 }
+            }));
+
+            unlisteners.push(await listen<CryptoError>("network:send:error", (event) => {
+                if (sendingFiles.has(event.payload.filename)) {
+                    sendingFiles.delete(event.payload.filename);
+                }
+                notify.error(event.payload.err, 3000);
             }));
 
             unlisteners.push(await listen("network:key:saved", (event) => {
