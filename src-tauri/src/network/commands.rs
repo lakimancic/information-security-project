@@ -79,6 +79,7 @@ pub fn start_file_listening(
     port: u16,
 ) -> Result<(), NetworkError> {
     let listener = TcpListener::bind(("0.0.0.0", port))?;
+    listener.set_nonblocking(false)?;
 
     let stop_flag = Arc::new(AtomicBool::new(false));
 
@@ -98,14 +99,6 @@ pub fn start_file_listening(
     let net_keys = state.net_keys.clone();
 
     thread::spawn(move || {
-        match listener.set_nonblocking(false) {
-            Ok(_) => {}
-            Err(_) => {
-                let _ = app.emit("network:error", NetworkError::NetworkInternalError("Failed to start file listener".into()).to_string() );
-                return;
-            }
-        };
-
         loop {
             if thread_stop.load(Ordering::SeqCst) {
                 break;
@@ -113,6 +106,10 @@ pub fn start_file_listening(
 
             match listener.accept() {
                 Ok((stream, addr)) => {
+                    if thread_stop.load(Ordering::SeqCst) {
+                        break;
+                    }
+
                     let locked_net_keys = net_keys.lock().unwrap();
                     let key = locked_net_keys.get(&addr.ip());
                     match key {
@@ -121,9 +118,6 @@ pub fn start_file_listening(
                             let _ = app.emit("network:error", NetworkError::SocketKeyNotFound(addr.to_string()).to_string());
                         }
                     }
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    thread::sleep(Duration::from_millis(100));
                 }
                 Err(e) => {
                     let _ = app.emit("network:error", e.to_string());
@@ -192,6 +186,7 @@ pub fn start_key_listening(
     port: u16,
 ) -> Result<(), NetworkError> {
     let listener = TcpListener::bind(("0.0.0.0", port))?;
+    listener.set_nonblocking(false)?;
     let stop_flag = {
         let mut ctrl = state.key_listener.lock()
             .map_err(|err| NetworkError::NetworkInternalError(err.to_string()))?;
@@ -203,14 +198,6 @@ pub fn start_key_listening(
     let net_keys = state.net_keys.clone();
 
     thread::spawn(move || {
-        match listener.set_nonblocking(false) {
-            Ok(_) => {}
-            Err(_) => {
-                let _ = app.emit("network:error", NetworkError::NetworkInternalError("Failed to start key listener".into()).to_string() );
-                return;
-            }
-        };
-
         loop {
             if thread_stop.load(Ordering::SeqCst) {
                 break;
@@ -218,6 +205,9 @@ pub fn start_key_listening(
 
             match listener.accept() {
                 Ok((mut stream, addr)) => {
+                    if thread_stop.load(Ordering::SeqCst) {
+                        break;
+                    }
 
                     match read_key_from_stream(&mut stream) {
                         Ok(key) => {
@@ -234,9 +224,6 @@ pub fn start_key_listening(
                     }
 
                     break;
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    thread::sleep(Duration::from_millis(100));
                 }
                 Err(e) => {
                     let _ = app.emit("network:key:error", e.to_string());

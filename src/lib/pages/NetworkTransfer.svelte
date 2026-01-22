@@ -136,7 +136,18 @@
     };
 
     const onFileAction = async (filename: string) => {
-        if (!key) return;
+        if (algo === null) {
+            notify.warning("Algorithm is not selected", 3000);
+            return;
+        }
+        else if (algoStr.startsWith("block:") && mode === null) {
+            notify.warning("Block mode is not selected", 3000);
+            return;
+        }
+        if (key === null) {
+            notify.warning("Key is not selected", 3000);
+            return;
+        }
         
         invoke("send_file", {
             request: {
@@ -151,7 +162,7 @@
             port: sendPort
         })
         .then(() => {
-
+            notify.success("File sent successfully.", 3000);
         })
         .catch((err: any) => {
             notify.error(err.message, 3000);
@@ -168,6 +179,9 @@
             },
             ip: sendIp,
             port: sendPort
+        })
+        .then(() => {
+            notify.success("Key sent successfully.", 3000);
         })
         .catch((err: any) => {
             notify.error(err.message, 3000);
@@ -264,6 +278,7 @@
             unlisteners.push(await listen("network:key:saved", (event) => {
                 loadNetKeys();
                 keyListening = false;
+                notify.info(`Received key from ${event.payload}`, 3000);
             }));
 
             unlisteners.push(await listen("network:error", (event) => {
@@ -300,6 +315,7 @@
                 if (receivingFiles.has(event.payload.filename)) {
                     receivingFiles.delete(event.payload.filename);
                 }
+                loadFiles(false);
             }));
 
             unlisteners.push(await listen<ProgressFile>("network:recv:progress", (event) => {
@@ -429,6 +445,7 @@
             >Send Key</button>
             <button
                 disabled={key === null || selectedFile === null || sendingFiles.size !== 0 || sendIp.length === 0 || Number.isNaN(parseInt(sendPort))}
+                onclick={() => selectedFile && onFileAction(selectedFile?.filename)}
                 class="bg-primary hover:bg-primary/60 text-bg-0 dark:text-fg-0 px-7 py-2 disabled:bg-bg-5 disabled:text-bg-1
                 dark:disabled:text-fg-3 flex gap-2 rounded-sm ml-auto cursor-pointer transition-colors duration-300"
             ><HardDriveUploadIcon /> Send File</button>
@@ -470,7 +487,7 @@
             <div class="grid grid-rows-2">
                 <div class="flex flex-col items-center justify-center gap-3">
                     {#if fileListening}
-                        <p>Listening for Key on :{recvPort}...</p>
+                        <p>Listening for Files on :{recvPort}...</p>
                         <button 
                             class="bg-error hover:bg-error/70 text-bg-0 dark:text-fg-0 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
                             onclick={() => stopListening(true)}
@@ -478,7 +495,7 @@
                     {:else}
                         <p>Listen for Files</p>
                         <button 
-                            disabled={Number.isNaN(parseInt(recvPort))}
+                            disabled={Number.isNaN(parseInt(recvPort)) || !recvLocked}
                             class="bg-primary hover:bg-primary/70 disabled:bg-bg-5 text-bg-0 dark:text-fg-0 disabled:dark:text-fg-3
                             disabled:text-bg-3 px-3 py-2 rounded-md cursor-pointer transition-colors duration-200"
                             onclick={() => listenFor(true)}
