@@ -3,7 +3,6 @@ use std::net::{IpAddr, SocketAddr, TcpListener};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::Duration;
 use tauri::Emitter;
 use crate::AppState;
 use crate::crypto::CryptoRequest;

@@ -11,6 +11,7 @@ pub mod hash_wrappers;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{fmt, prelude::*};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use crate::crypto::commands::{decrypt_file, encrypt_file, stop_processing};
@@ -39,11 +40,11 @@ pub struct AppState {
     watcher: WatcherState
 }
 
-fn init_tracing() {
+fn init_tracing() -> WorkerGuard {
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let file_appender =
         RollingFileAppender::new(Rotation::NEVER, "logs", &format!("app-{}.log", today));
-    let (non_blocking_file, _guard) = tracing_appender::non_blocking(file_appender);
+    let (non_blocking_file, guard) = tracing_appender::non_blocking(file_appender);
 
     let stdout_layer = fmt::layer()
         .with_writer(std::io::stdout)
@@ -58,12 +59,14 @@ fn init_tracing() {
         .with(stdout_layer)
         .with(file_layer)
         .init();
+
+    guard
 }
 
 #[allow(clippy::missing_panics_doc)]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    init_tracing();
+    let _tracing_guard = init_tracing();
 
     tauri::Builder::default()
         .manage(AppState {

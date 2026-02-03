@@ -155,7 +155,8 @@
                 mode: mode ? modeStr : undefined,
                 key: key.key,
                 iv: key.iv,
-                hash_algo: hashStr
+                hash_algo: hashStr,
+                padding: mode ? 'pkcs7' : undefined
             },
             file: filename,
             ip: sendIp,

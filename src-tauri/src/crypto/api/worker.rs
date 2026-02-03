@@ -181,6 +181,12 @@ pub fn decrypt_worker(
 
     let total = metadata.size;
 
+    app.emit("crypto:start", CryptoProgress {
+        filename: output_str.clone(),
+        processed: 0,
+        total,
+    })?;
+
     match run_crypto_job(
         app,
         output_file,

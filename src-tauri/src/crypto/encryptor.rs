@@ -115,6 +115,7 @@ impl Encryptor {
             let chunk_size = (BUFFER_SIZE / bs) * bs;
 
             let mut buffer = vec![0u8; chunk_size];
+            let mut out_buf = Vec::with_capacity(chunk_size);
             let mut leftover = Vec::<u8>::new();
             let mut last_block: Option<Vec<u8>> = None;
 
@@ -142,8 +143,13 @@ impl Encryptor {
                     mode.decrypt_next(cipher.deref(), block)?;
 
                     if let Some(prev) = last_block.replace(block.to_vec()) {
-                        output.write_all(&prev)?;
+                        out_buf.extend_from_slice(&prev);
                     }
+                }
+
+                if !out_buf.is_empty() {
+                    output.write_all(&out_buf)?;
+                    out_buf.clear();
                 }
 
                 leftover.extend_from_slice(rest);

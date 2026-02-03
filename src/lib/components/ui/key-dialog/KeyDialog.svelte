@@ -42,6 +42,7 @@
             errorMsg = '';
             genName = '';
             genPass = '';
+            genPassRep = '';
             selectedKey = outputKey?.label ?? '';
             selectedPass = '';
             currentTab = "select-existing";

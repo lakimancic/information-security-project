@@ -129,7 +129,7 @@
                     mode: mode ? modeStr : undefined,
                     key: key.key,
                     iv: key.iv,
-                    padding: 'pkcs7'
+                    padding: mode ? 'pkcs7' : undefined
                 },
                 file: filename
             });
@@ -145,9 +145,7 @@
         }
 
         invoker
-        .then(() => {
-            loadFiles(false, false);
-        })
+        .then(() => {})
         .catch(err => {
             notify.error(err, 3000);
         });
@@ -249,6 +247,7 @@
                 if (processFiles.has(event.payload.filename)) {
                     processFiles.delete(event.payload.filename);
                 }
+                loadFiles(false);
             }));
 
             unlisteners.push(await listen<ProgressFile>("crypto:progress", (event) => {
