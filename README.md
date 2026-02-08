@@ -5,12 +5,14 @@ KriptOx — Information Security project (university)
 KriptOx is a desktop application built as a university information-security project. It provides secure file encryption/decryption, local file management, key management, and network transfer functionality. The UI is a Svelte + Vite frontend bundled into a Tauri desktop app; the backend cryptography and system integrations are implemented in Rust.
 
 **Key features**
+
 - **Encrypt / Decrypt files:** Symmetric block and stream cipher implementations for file encryption and decryption.
 - **Key Manager:** Create, store, and manage keys using the app's key manager subsystem.
 - **Network Transfer (TCP):** Send and receive encrypted files over the network via the built-in sender/receiver modules.
 - **Local File System Explorer:** Browse and operate on local files from the UI.
 
 Project layout (selected files & folders)
+
 - `src/` (frontend)
   - `src/lib/pages/KeyManager.svelte` — Key manager UI page
   - `src/lib/pages/LocalFileSystem.svelte` — Local file explorer UI
@@ -24,11 +26,13 @@ Project layout (selected files & folders)
   - `src-tauri/tauri.conf.json` — Tauri configuration
 
 Architecture overview
+
 - Frontend: Svelte + Vite app in `src/` provides the UI (pages for key management, file browsing, network transfer). The app communicates with the Rust backend via Tauri commands.
 - Backend: Rust code under `src-tauri/src/` implements cryptographic primitives, file and key management, and network transfer. This keeps sensitive operations in a native, auditable layer.
 - Build: Vite builds the web frontend, then Tauri packages the app into a native desktop binary with the Rust backend.
 
 Supported cryptography (implemented in Rust modules)
+
 - Block ciphers: AES-256, XTEA (examples present in `src-tauri/src/crypto/block/`)
 - Stream ciphers: A5/1 (in `src-tauri/src/crypto/stream/`)
 - Hashing: BLAKE variants (e.g., `blake_256.rs`)
@@ -36,6 +40,7 @@ Supported cryptography (implemented in Rust modules)
 
 How to run (development)
 Prerequisites
+
 - Node.js (recommended v16+), npm or yarn
 - Rust toolchain (stable) and Cargo
 - Tauri prerequisites for your OS (see Tauri docs)
@@ -70,29 +75,36 @@ npm run tauri build
 After a successful Tauri build, native bundles or binaries are placed under `src-tauri/target/release/bundle` (or the platform-specific output shown by Tauri).
 
 Security notes
+
 - Keep private keys secure — the key manager persists keys on disk; treat them like sensitive material.
 - This project is an academic implementation: for production or real-world security use, perform an independent security audit and ensure best-practice key storage and secure transport (e.g., authenticated channels).
 
 Contributing & next steps
+
 - Run the app locally (see commands above) and exercise encryption, key management and network transfer flows.
 - If you want, I can add: example key import/export, automated tests for crypto modules, or CI build scripts.
 
 License
+
 - See `LICENSE` in the repository root for license details.
 
 Contact
+
 - For questions about this repository or the assignment, contact the project author or maintainers listed in repository metadata.
-For questions about this repository or the assignment, contact the project author or maintainers listed in repository metadata.
+  For questions about this repository or the assignment, contact the project author or maintainers listed in repository metadata.
 
 Template
+
 - Project scaffolded from a Tauri + Svelte starter template. The UI uses the `bits-ui` component library alongside local components under `src/lib/components/ui/`.
 
 Requirements
+
 - Node.js (recommended v16+), npm or yarn
 - Rust toolchain (stable) and Cargo
 - Tauri prerequisites for your OS (see Tauri docs)
 
 Setup
+
 1. Clone the repository and install dependencies:
 
 ```bash
@@ -117,8 +129,10 @@ npm run tauri build
 ```
 
 Other links
+
 - Svelte 5: https://svelte.dev/docs
 - Tauri: https://tauri.app/start/
 
 License
+
 - See `LICENSE` in the repository root for license details.

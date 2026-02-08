@@ -1,12 +1,26 @@
 <script lang="ts">
-	import type { LocalFile, PendingFile, ProgressFile } from '$lib/components/ui/file-explorer/utils';
-	import { sizeToString, typeToIcon } from '$lib/components/ui/file-explorer/utils';
+	import type {
+		LocalFile,
+		PendingFile,
+		ProgressFile
+	} from '$lib/components/ui/file-explorer/utils';
+	import {
+		sizeToString,
+		typeToIcon
+	} from '$lib/components/ui/file-explorer/utils';
 	import { writable } from 'svelte/store';
-	import { ArrowDown, ArrowUp, CheckIcon, RotateCwIcon, XIcon, type IconProps } from '@lucide/svelte';
+	import {
+		ArrowDown,
+		ArrowUp,
+		CheckIcon,
+		RotateCwIcon,
+		XIcon,
+		type IconProps
+	} from '@lucide/svelte';
 	import type { Component } from 'svelte';
 
 	let {
-		"class": className,
+		class: className,
 		files = [],
 		processingFiles,
 		pendingFiles,
@@ -14,8 +28,8 @@
 		label,
 		locked = $bindable(false),
 		selectedFile = $bindable(null),
-		lockIcon : LockIcon,
-		unlockIcon : UnlockIcon,
+		lockIcon: LockIcon,
+		unlockIcon: UnlockIcon,
 		constFilter,
 
 		onGoBack,
@@ -25,16 +39,16 @@
 		onSetAbsolutePath,
 		onLockChange,
 		onRefresh,
-		onAcceptRejectFile,
-	} : {
-		"class": string;
+		onAcceptRejectFile
+	}: {
+		class: string;
 		files: LocalFile[];
 		pendingFiles: PendingFile[];
 		processingFiles: ProgressFile[];
 		pwd: string;
 		label: string;
 		locked: boolean;
-		selectedFile: LocalFile|null;
+		selectedFile: LocalFile | null;
 		lockIcon: Component<IconProps, {}>;
 		unlockIcon: Component<IconProps, {}>;
 		constFilter?: RegExp;
@@ -50,28 +64,28 @@
 	} = $props();
 
 	const searchText = writable('');
-	let searchFilter = $state(new RegExp(""));
+	let searchFilter = $state(new RegExp(''));
 	let oldPwd = $state('');
 
 	const indexStack = $state<number[]>([]);
 
-	let searchBar : HTMLInputElement;
-	let pwdBar : HTMLInputElement;
-	let itemsMenu : HTMLDivElement;
+	let searchBar: HTMLInputElement;
+	let pwdBar: HTMLInputElement;
+	let itemsMenu: HTMLDivElement;
 
 	let selectedIndex = $state(-1);
 
-	type SortColumn = 'name'|'date'|'size'|'type';
+	type SortColumn = 'name' | 'date' | 'size' | 'type';
 	let sortBy = writable<SortColumn>('name');
-	let sortDirection = writable<'asc'|'desc'>('asc');
+	let sortDirection = writable<'asc' | 'desc'>('asc');
 
 	const ArrowIcon = $derived($sortDirection === 'asc' ? ArrowUp : ArrowDown);
 
 	const tableColumns = [
-		{ title: "Filename", sortKey: "name" },
-		{ title: "Last Modified", sortKey: "date" },
-		{ title: "Size", sortKey: "size" },
-		{ title: "Type", sortKey: "type" },
+		{ title: 'Filename', sortKey: 'name' },
+		{ title: 'Last Modified', sortKey: 'date' },
+		{ title: 'Size', sortKey: 'size' },
+		{ title: 'Type', sortKey: 'type' }
 	];
 
 	let rowEls = $state<{ [key: number]: HTMLDivElement | null }>({});
@@ -85,23 +99,30 @@
 	});
 
 	const filesWithBack = $derived.by(() => {
-		const filesCopy = files.toSorted((a, b) => {
-			let res = 0;
-			if ($sortBy === 'size') res = (a.size ?? 0) - (b.size ?? 0);
-			else if ($sortBy === 'date') res = (new Date(a.lastModified).getTime() - new Date(b.lastModified).getTime());
-			else if ($sortBy === 'name') res = a.filename.localeCompare(b.filename);
-			else res = a.typeLong?.localeCompare(b.typeLong ?? '') ?? 0;
+		const filesCopy = files
+			.toSorted((a, b) => {
+				let res = 0;
+				if ($sortBy === 'size') res = (a.size ?? 0) - (b.size ?? 0);
+				else if ($sortBy === 'date')
+					res =
+						new Date(a.lastModified).getTime() -
+						new Date(b.lastModified).getTime();
+				else if ($sortBy === 'name') res = a.filename.localeCompare(b.filename);
+				else res = a.typeLong?.localeCompare(b.typeLong ?? '') ?? 0;
 
-			return res * ($sortDirection === 'asc' ? 1 : -1);
-		}).filter(file => {
-			if (constFilter && file.fileType !== "folder") {
-				return constFilter.test(file.filename) && searchFilter.test(file.filename);
-			}
-			return searchFilter.test(file.filename);
-		});
-		
+				return res * ($sortDirection === 'asc' ? 1 : -1);
+			})
+			.filter((file) => {
+				if (constFilter && file.fileType !== 'folder') {
+					return (
+						constFilter.test(file.filename) && searchFilter.test(file.filename)
+					);
+				}
+				return searchFilter.test(file.filename);
+			});
+
 		return [
-			{ filename: "..", lastModified: "", fileType: "back", size: 0 },
+			{ filename: '..', lastModified: '', fileType: 'back', size: 0 },
 			...filesCopy
 		];
 	});
@@ -140,7 +161,7 @@
 
 	const handleColumnClick = (colName: SortColumn) => {
 		if (colName === $sortBy) {
-			sortDirection.update(old => old === 'asc' ? 'desc' : 'asc');
+			sortDirection.update((old) => (old === 'asc' ? 'desc' : 'asc'));
 		} else {
 			sortBy.update(() => colName);
 		}
@@ -156,7 +177,7 @@
 			handleGoBack();
 		} else if (e.key === 'ArrowRight') {
 			const selectedFile = filesWithBack[selectedIndex];
-			if (selectedFile.fileType === "folder") {
+			if (selectedFile.fileType === 'folder') {
 				handleChangeDir(selectedFile.filename, selectedIndex);
 				return;
 			}
@@ -166,7 +187,10 @@
 		} else if (e.key === '?') {
 			pwdBar.focus();
 		}
-		selectedIndex = Math.min(Math.max(selectedIndex, 1), filesWithBack.length-1);
+		selectedIndex = Math.min(
+			Math.max(selectedIndex, 1),
+			filesWithBack.length - 1
+		);
 	};
 
 	const handleItemClick = (fileIndex: number, e: MouseEvent) => {
@@ -176,9 +200,9 @@
 	};
 
 	const handleItemDoubleClick = (file: LocalFile, index: number) => {
-		if (file.fileType === "back") {
+		if (file.fileType === 'back') {
 			handleGoBack();
-		} else if (file.fileType == "folder") {
+		} else if (file.fileType == 'folder') {
 			handleChangeDir(file.filename, index);
 		} else {
 			onFileAction(file.filename);
@@ -231,7 +255,7 @@
 
 		const row = rowEls[i === 1 ? 0 : i];
 		if (!row) return;
-		
+
 		row.scrollIntoView({
 			block: 'nearest',
 			behavior: 'auto'
@@ -240,91 +264,97 @@
 </script>
 
 <div class="flex flex-col {className} box-border">
-	<p class="p-2 text-center text-xl text-fg-2">{label}</p>
-	<div class="flex bg-bg-2 p-2 text-sm text-primary font-bold gap-2">
+	<p class="text-fg-2 p-2 text-center text-xl">{label}</p>
+	<div class="bg-bg-2 text-primary flex gap-2 p-2 text-sm font-bold">
 		<input
 			type="text"
 			bind:value={pwd}
-			class="w-full border-none disabled:text-primary/50 outline-none"
+			class="disabled:text-primary/50 w-full border-none outline-none"
 			onfocusin={pwdFocusIn}
 			onfocusout={pwdFocusOut}
 			bind:this={pwdBar}
 			onkeydown={pwdKeyDown}
 			disabled={locked}
 		/>
-		<RotateCwIcon 
-			class="cursor-pointer text-fg-3 hover:text-fg-0 transition-colors duration-300 data-[disabled=true]:text-fg-3/60" 
+		<RotateCwIcon
+			class="text-fg-3 hover:text-fg-0 data-[disabled=true]:text-fg-3/60 cursor-pointer transition-colors duration-300"
 			onclick={handleRefreshClick}
 			data-disabled={locked}
 		/>
 		{#if locked}
-			<UnlockIcon class="cursor-pointer text-fg-2 hover:text-primary transition-colors duration-300" onclick={handleLockClick} />
+			<UnlockIcon
+				class="text-fg-2 hover:text-primary cursor-pointer transition-colors duration-300"
+				onclick={handleLockClick}
+			/>
 		{:else}
-			<LockIcon class="cursor-pointer text-fg-2 hover:text-primary transition-colors duration-300" onclick={handleLockClick} />
+			<LockIcon
+				class="text-fg-2 hover:text-primary cursor-pointer transition-colors duration-300"
+				onclick={handleLockClick}
+			/>
 		{/if}
 	</div>
 
-	<div 
-		class="flex flex-col flex-1 min-h-0 w-full text-left outline-none"
+	<div
+		class="flex min-h-0 w-full flex-1 flex-col text-left outline-none"
 		role="menu"
 		onkeydown={handleKeyDown}
 		tabindex="0"
 		bind:this={itemsMenu}
 	>
 		<div
-			class="grid grid-cols-[2rem_2fr_2fr_1fr_2fr] bg-bg-1 text-sm font-medium shrink-0"
+			class="bg-bg-1 grid shrink-0 grid-cols-[2rem_2fr_2fr_1fr_2fr] text-sm font-medium"
 		>
 			<div></div>
 			{#each tableColumns as column}
-				<button 
-					class="px-2 py-2 truncate text-left flex items-center group cursor-pointer"
+				<button
+					class="group flex cursor-pointer items-center truncate px-2 py-2 text-left"
 					onclick={() => handleColumnClick(column.sortKey as SortColumn)}
 				>
 					{column.title}
-					<ArrowIcon class="h-4 transition-all duration-300 {$sortBy === column.sortKey ? 'text-fg-0' : 'text-fg-3/0 group-hover:text-fg-3'}" />
+					<ArrowIcon
+						class="h-4 transition-all duration-300 {$sortBy === column.sortKey
+							? 'text-fg-0'
+							: 'text-fg-3/0 group-hover:text-fg-3'}"
+					/>
 				</button>
 			{/each}
 		</div>
-		<div class="flex-1 min-h-0 overflow-y-auto">
+		<div class="min-h-0 flex-1 overflow-y-auto">
 			{#each pendingFiles as file, fileIndex}
 				<div
 					bind:this={rowEls[fileIndex]}
-					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm box-border outline-none bg-warning/10 hover:bg-warning/15 relative`}
+					class={`bg-warning/10 hover:bg-warning/15 relative box-border grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center text-sm outline-none select-none`}
 					role="button"
 					onkeydown={() => {}}
 					tabindex="-1"
 				>
 					<div class="py-2 pl-2">
-						<img
-							src={typeToIcon("")}
-							class="h-6"
-							alt="file-icon"
-						/>
+						<img src={typeToIcon('')} class="h-6" alt="file-icon" />
 					</div>
 
-					<div class="px-2 py-2 truncate">
+					<div class="truncate px-2 py-2">
 						{file.filename}
 					</div>
 
-					<div class="px-4 py-2 truncate w-full">
+					<div class="w-full truncate px-4 py-2">
 						Sender: {file.sockAddr}
 					</div>
 
 					<div class="px-4 py-2 text-left">
-						{file.size ? sizeToString(file.size) : ""}
+						{file.size ? sizeToString(file.size) : ''}
 					</div>
 
-					<div class="px-4 py-2 truncate">Pending File</div>
-					<div class="flex absolute right-5">
+					<div class="truncate px-4 py-2">Pending File</div>
+					<div class="absolute right-5 flex">
 						<button
-						class="text-success cursor-pointer hover:bg-success/30 rounded-full p-1"
-						onclick={() => onAcceptRejectFile(file.sockAddr, true)}
+							class="text-success hover:bg-success/30 cursor-pointer rounded-full p-1"
+							onclick={() => onAcceptRejectFile(file.sockAddr, true)}
 						>
 							<CheckIcon />
 						</button>
 						<button
-						class="text-error cursor-pointer hover:bg-error/30 rounded-full p-1"
-						onclick={() => onAcceptRejectFile(file.sockAddr, false)}
+							class="text-error hover:bg-error/30 cursor-pointer rounded-full p-1"
+							onclick={() => onAcceptRejectFile(file.sockAddr, false)}
 						>
 							<XIcon />
 						</button>
@@ -334,39 +364,37 @@
 			{#each processingFiles as file, fileIndex}
 				<div
 					bind:this={rowEls[fileIndex]}
-					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm box-border outline-none bg-primary/10 hover:bg-primary/15 relative`}
+					class={`bg-primary/10 hover:bg-primary/15 relative box-border grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center text-sm outline-none select-none`}
 					role="button"
 					onkeydown={() => {}}
 					tabindex="-1"
 				>
 					<div class="py-2 pl-2">
-						<img
-							src={typeToIcon("")}
-							class="h-6"
-							alt="file-icon"
-						/>
+						<img src={typeToIcon('')} class="h-6" alt="file-icon" />
 					</div>
 
-					<div class="px-2 py-2 truncate">
+					<div class="truncate px-2 py-2">
 						{file.filename}
 					</div>
 
-					<div class="px-4 py-2 truncate w-full">
-						<div class="w-full border border-fg-0/20 h-6 rounded-md overflow-hidden">
-							<div 
-								class="h-full bg-success"
-								style="width: {(100 * file.processed / file.total) || 0}%"
+					<div class="w-full truncate px-4 py-2">
+						<div
+							class="border-fg-0/20 h-6 w-full overflow-hidden rounded-md border"
+						>
+							<div
+								class="bg-success h-full"
+								style="width: {(100 * file.processed) / file.total || 0}%"
 							></div>
 						</div>
 					</div>
 
 					<div class="px-4 py-2 text-left">
-						{file.size ? sizeToString(file.size) : ""}
+						{file.size ? sizeToString(file.size) : ''}
 					</div>
 
-					<div class="px-4 py-2 truncate">Encrypted File</div>
+					<div class="truncate px-4 py-2">Encrypted File</div>
 					<button
-						class="absolute right-5 text-error cursor-pointer hover:bg-error/30 rounded-full p-1"
+						class="text-error hover:bg-error/30 absolute right-5 cursor-pointer rounded-full p-1"
 						onclick={() => onStopProcessingFile(file.filename)}
 					>
 						<XIcon />
@@ -376,10 +404,12 @@
 			{#each filesWithBack as file, fileIndex}
 				<div
 					bind:this={rowEls[fileIndex]}
-					class={`grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center select-none text-sm box-border outline-none
-					${fileIndex == selectedIndex
-						? `shadow-[inset_0_0_0_1px] ${locked ? "shadow-fg-5 bg-fg-5/20" : "shadow-primary bg-primary/20"}`
-						: "hover:bg-bg-2/50"}`}
+					class={`box-border grid grid-cols-[auto_2fr_2fr_1fr_2fr] items-center text-sm outline-none select-none
+					${
+						fileIndex == selectedIndex
+							? `shadow-[inset_0_0_0_1px] ${locked ? 'shadow-fg-5 bg-fg-5/20' : 'shadow-primary bg-primary/20'}`
+							: 'hover:bg-bg-2/50'
+					}`}
 					role="button"
 					onclick={(e) => handleItemClick(fileIndex, e)}
 					ondblclick={() => handleItemDoubleClick(file, fileIndex)}
@@ -388,26 +418,26 @@
 				>
 					<div class="py-2 pl-2">
 						<img
-							src={typeToIcon(file.fileType ?? "")}
+							src={typeToIcon(file.fileType ?? '')}
 							class="h-6"
 							alt="file-icon"
 						/>
 					</div>
 
-					<div class="px-2 py-2 truncate">
+					<div class="truncate px-2 py-2">
 						{file.filename}
 					</div>
 
-					<div class="px-4 py-2 truncate">
+					<div class="truncate px-4 py-2">
 						{file.lastModified}
 					</div>
 
 					<div class="px-4 py-2 text-left">
-						{file.size ? sizeToString(file.size) : ""}
+						{file.size ? sizeToString(file.size) : ''}
 					</div>
 
-					<div class="px-4 py-2 truncate">
-						{file.typeLong ?? ""}
+					<div class="truncate px-4 py-2">
+						{file.typeLong ?? ''}
 					</div>
 				</div>
 			{/each}
@@ -418,7 +448,7 @@
 			type="text"
 			placeholder="Search..."
 			bind:value={$searchText}
-			class="w-full p-2 border border-bg-4 rounded outline-none disabled:text-fg-2/60"
+			class="border-bg-4 disabled:text-fg-2/60 w-full rounded border p-2 outline-none"
 			bind:this={searchBar}
 			onkeydown={searchKeyDown}
 			disabled={locked}

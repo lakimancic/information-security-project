@@ -1,405 +1,487 @@
 <script lang="ts">
-	import FileExplorer from "$lib/components/ui/file-explorer/FileExplorer.svelte";
-	import type { LocalFile, ProgressFile } from "$lib/components/ui/file-explorer/utils";
-	import KeyDialog from "$lib/components/ui/key-dialog/KeyDialog.svelte";
-	import * as Select from "$lib/components/ui/select/index";
-	import { blockCiphers, blockModes, type CryptoError, streamCiphers, type Key } from "$lib/types/crypto";
-	import { EyeOffIcon, LockIcon, LockOpenIcon, ScanEyeIcon } from "@lucide/svelte";
-    import { invoke } from '@tauri-apps/api/core';
-    import { listen } from "@tauri-apps/api/event";
-	import { onMount } from "svelte";
-    import { SvelteMap } from "svelte/reactivity";
-    import { notify } from "$lib/components/ui/notifications/store";
+	import FileExplorer from '$lib/components/ui/file-explorer/FileExplorer.svelte';
+	import type {
+		LocalFile,
+		ProgressFile
+	} from '$lib/components/ui/file-explorer/utils';
+	import KeyDialog from '$lib/components/ui/key-dialog/KeyDialog.svelte';
+	import * as Select from '$lib/components/ui/select/index';
+	import {
+		blockCiphers,
+		blockModes,
+		type CryptoError,
+		streamCiphers,
+		type Key
+	} from '$lib/types/crypto';
+	import {
+		EyeOffIcon,
+		LockIcon,
+		LockOpenIcon,
+		ScanEyeIcon
+	} from '@lucide/svelte';
+	import { invoke } from '@tauri-apps/api/core';
+	import { listen } from '@tauri-apps/api/event';
+	import { onMount } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
+	import { notify } from '$lib/components/ui/notifications/store';
 
-    let sourceFiles: LocalFile[] = $state([]);
-    let sourceCwd: string = $state('');
+	let sourceFiles: LocalFile[] = $state([]);
+	let sourceCwd: string = $state('');
 
-    let destFiles: LocalFile[] = $state([]);
-    let destCwd: string = $state('');
+	let destFiles: LocalFile[] = $state([]);
+	let destCwd: string = $state('');
 
-    let processFiles = $state<SvelteMap<string, ProgressFile>>(new SvelteMap());
+	let processFiles = $state<SvelteMap<string, ProgressFile>>(new SvelteMap());
 
-    let algoStr = $state('');
-    let modeStr = $state('');
+	let algoStr = $state('');
+	let modeStr = $state('');
 
-    let operation = $state<'dec'|'enc'>('enc');
-    let key = $state<Key|null>(null);
-    let cachedKeys = $state<{ [algoMode: string] : Key}>({});
+	let operation = $state<'dec' | 'enc'>('enc');
+	let key = $state<Key | null>(null);
+	let cachedKeys = $state<{ [algoMode: string]: Key }>({});
 
-    let destLocked = $state(false);
-    let sourceWatch = $state(false);
+	let destLocked = $state(false);
+	let sourceWatch = $state(false);
 
-    let selectedFile : LocalFile|null = $state(null);
+	let selectedFile: LocalFile | null = $state(null);
 
-    let algo = $derived.by(() => {
-        return [...blockCiphers, ...streamCiphers].find(v => v.value === algoStr) ?? null
-    });
-    let mode = $derived.by(() => {
-        return blockModes.find(v => v.value === modeStr) ?? null
-    });
+	let algo = $derived.by(() => {
+		return (
+			[...blockCiphers, ...streamCiphers].find((v) => v.value === algoStr) ??
+			null
+		);
+	});
+	let mode = $derived.by(() => {
+		return blockModes.find((v) => v.value === modeStr) ?? null;
+	});
 
-    let processFilesArray = $derived.by(() => {
-        return Array.from(processFiles.values());
-    });
+	let processFilesArray = $derived.by(() => {
+		return Array.from(processFiles.values());
+	});
 
-    const triggerContent = $derived(
-        streamCiphers.find(c => c.value === algoStr)?.label ??
-        blockCiphers.find(c => c.value === algoStr)?.label ?? "Select Cipher"
-    );
+	const triggerContent = $derived(
+		streamCiphers.find((c) => c.value === algoStr)?.label ??
+			blockCiphers.find((c) => c.value === algoStr)?.label ??
+			'Select Cipher'
+	);
 
-    const triggerContentMode = $derived(
-        blockModes.find(m => m.value === modeStr)?.label ?? "Select Mode"
-    );
+	const triggerContentMode = $derived(
+		blockModes.find((m) => m.value === modeStr)?.label ?? 'Select Mode'
+	);
 
-    const loadFiles = async (source: boolean, reset: boolean = false) => {
-        await invoke('get_files', { source, reset }).then((res: any) => {
-            if (source) {
-                sourceFiles = res.files as LocalFile[];
-                sourceCwd = res.pwd as string;
-            } else {
-                destFiles = res.files as LocalFile[];
-                destCwd = res.pwd as string;
-            }
-        })
-        .catch(err => {
-            notify.error(err, 3000);
-        });
-    };
+	const loadFiles = async (source: boolean, reset: boolean = false) => {
+		await invoke('get_files', { source, reset })
+			.then((res: any) => {
+				if (source) {
+					sourceFiles = res.files as LocalFile[];
+					sourceCwd = res.pwd as string;
+				} else {
+					destFiles = res.files as LocalFile[];
+					destCwd = res.pwd as string;
+				}
+			})
+			.catch((err) => {
+				notify.error(err, 3000);
+			});
+	};
 
-    const changeDir = async (newDir: string, source: boolean) => {
-        try {
-            const res : boolean = await invoke('change_dir', { newDir, source });
-            if (res) await loadFiles(source);
+	const changeDir = async (newDir: string, source: boolean) => {
+		try {
+			const res: boolean = await invoke('change_dir', { newDir, source });
+			if (res) await loadFiles(source);
 
-            return res;
-        } catch(err) {
-            return false;
-        }
-    };
+			return res;
+		} catch (err) {
+			return false;
+		}
+	};
 
-    const goDirBack = async (source: boolean) => {
-        try {
-            const res : boolean = await invoke('go_dir_back', { source });
-            if (res) await loadFiles(source);
+	const goDirBack = async (source: boolean) => {
+		try {
+			const res: boolean = await invoke('go_dir_back', { source });
+			if (res) await loadFiles(source);
 
-            return res;
-        } catch(err) {
-            return false;
-        }
-    };
+			return res;
+		} catch (err) {
+			return false;
+		}
+	};
 
-    const setAbsolutePath = async (newDir: string, source: boolean) => {
-        try {
-            const res : boolean = await invoke('set_current_dir', { newDir, source });
-            if (res) await loadFiles(source);
+	const setAbsolutePath = async (newDir: string, source: boolean) => {
+		try {
+			const res: boolean = await invoke('set_current_dir', { newDir, source });
+			if (res) await loadFiles(source);
 
-            return res;
-        } catch(err) {
-            return false;
-        }
-    };
+			return res;
+		} catch (err) {
+			return false;
+		}
+	};
 
-    const onFileAction = async (filename: string) => {
-        if (operation === 'enc') {
-            if (algo === null) {
-                notify.warning("Algorithm is not selected", 3000);
-                return;
-            }
-            else if (algoStr.startsWith("block:") && mode === null) {
-                notify.warning("Block mode is not selected", 3000);
-                return;
-            }
-        }
+	const onFileAction = async (filename: string) => {
+		if (operation === 'enc') {
+			if (algo === null) {
+				notify.warning('Algorithm is not selected', 3000);
+				return;
+			} else if (algoStr.startsWith('block:') && mode === null) {
+				notify.warning('Block mode is not selected', 3000);
+				return;
+			}
+		}
 
-        if (key === null) {
-            notify.warning("Key is not selected", 3000);
-            return;
-        }
+		if (key === null) {
+			notify.warning('Key is not selected', 3000);
+			return;
+		}
 
-        if (!destLocked) {
-            notify.warning(`Before ${operation === 'enc' ? 'encryption' : 'decryption'} destination directory must be locked.`, 3000);
-            return;
-        }
+		if (!destLocked) {
+			notify.warning(
+				`Before ${operation === 'enc' ? 'encryption' : 'decryption'} destination directory must be locked.`,
+				3000
+			);
+			return;
+		}
 
-        let invoker;
-        if (operation === 'enc') {
-            invoker = invoke("encrypt_file", { 
-                request: {
-                    algorithm: algoStr,
-                    mode: mode ? modeStr : undefined,
-                    key: key.key,
-                    iv: key.iv,
-                    padding: mode ? 'pkcs7' : undefined
-                },
-                file: filename
-            });
-        }
-        else {
-            invoker = invoke("decrypt_file", { 
-                key: {
-                    key: key.key,
-                    iv: key.iv
-                },
-                file: filename
-            })
-        }
+		let invoker;
+		if (operation === 'enc') {
+			invoker = invoke('encrypt_file', {
+				request: {
+					algorithm: algoStr,
+					mode: mode ? modeStr : undefined,
+					key: key.key,
+					iv: key.iv,
+					padding: mode ? 'pkcs7' : undefined
+				},
+				file: filename
+			});
+		} else {
+			invoker = invoke('decrypt_file', {
+				key: {
+					key: key.key,
+					iv: key.iv
+				},
+				file: filename
+			});
+		}
 
-        invoker
-        .then(() => {})
-        .catch(err => {
-            notify.error(err, 3000);
-        });
-    };
+		invoker
+			.then(() => {})
+			.catch((err) => {
+				notify.error(err, 3000);
+			});
+	};
 
-    const stopFileEncryption = async (filename: string) => {
-        const realFilename = operation === 'enc' ?
-            filename.replace(/\.enc$/, '') : `${filename}.enc`;
-        invoke("stop_processing", { filename: realFilename, encrypt: operation === 'enc' })
-        .then(() => {
-            if (processFiles.has(filename)) {
-                processFiles.delete(filename);
-            }
-        })
-        .catch(err => {
-            notify.error(err, 3000);
-        })
-    };
+	const stopFileEncryption = async (filename: string) => {
+		const realFilename =
+			operation === 'enc' ? filename.replace(/\.enc$/, '') : `${filename}.enc`;
+		invoke('stop_processing', {
+			filename: realFilename,
+			encrypt: operation === 'enc'
+		})
+			.then(() => {
+				if (processFiles.has(filename)) {
+					processFiles.delete(filename);
+				}
+			})
+			.catch((err) => {
+				notify.error(err, 3000);
+			});
+	};
 
-    const onFileSystemWatch = async (locked: boolean) : Promise<boolean> => {
-        if (!key) return false;
+	const onFileSystemWatch = async (locked: boolean): Promise<boolean> => {
+		if (key === null) {
+			notify.warning('Key is not selected', 3000);
+			return;
+		}
 
-        if (!locked) {
-            try {
-                await invoke("stop_file_watching");
-                return true;
-            }
-            catch(err: any) {
-                return false;
-            }
-        }
-        else {
-            let mode = operation === 'enc' ? {
-                Encrypt: {
-                    algorithm: algoStr,
-                    mode: modeStr,
-                    key: key.key,
-                    iv: key.iv
-                }
-            } : {
-                Decrypt: {
-                    key: key.key,
-                    iv: key.iv
-                }
-            };
+		if (operation === 'enc') {
+			if (algo === null) {
+				notify.warning('Algorithm is not selected', 3000);
+				return;
+			} else if (algoStr.startsWith('block:') && mode === null) {
+				notify.warning('Block mode is not selected', 3000);
+				return;
+			}
+		}
+		else {
+			notify.warning('File System Watching supports only encryption', 3000);
+			return;
+		}
 
-            try {
-                await invoke("start_file_watching", { mode });
-                return true;
-            }
-            catch(err: any) {
-                notify.error(err, 3000);
-                return false;
-            }
-        }
-    };
+		if (!destLocked) {
+			notify.warning(
+				`Before watching file system, destination directory must be locked.`,
+				3000
+			);
+			return;
+		}
 
-    const onKeySet = (newKey: Key) => {
-        cachedKeys[algoStr + ":" + modeStr] = newKey;
-    };
+		if (!locked) {
+			try {
+				await invoke('stop_file_watching');
+				return true;
+			} catch (err: any) {
+				return false;
+			}
+		} else {
+			let mode =
+				operation === 'enc'
+					? {
+							Encrypt: {
+								algorithm: algoStr,
+								mode: modeStr,
+								key: key.key,
+								iv: key.iv
+							}
+						}
+					: {
+							Decrypt: {
+								key: key.key,
+								iv: key.iv
+							}
+						};
 
-    const onAlgoSelect = (newAlgo: string) => {
-        if (cachedKeys[newAlgo + ":" + modeStr])
-            key = cachedKeys[newAlgo + ":" + modeStr];
-        else
-            key = null;
-    };
+			try {
+				await invoke('start_file_watching', { mode });
+				return true;
+			} catch (err: any) {
+				notify.error(err, 3000);
+				return false;
+			}
+		}
+	};
 
-    const onModeSelect = (newMode: string) => {
-        if (cachedKeys[algoStr + ":" + newMode])
-            key = cachedKeys[algoStr + ":" + newMode];
-        else
-            key = null;
-    };
+	const onKeySet = (newKey: Key) => {
+		cachedKeys[algoStr + ':' + modeStr] = newKey;
+	};
 
-    const onDestLockChange = async () => {
-        if (processFiles.size === 0)
-            return true;
-        return false;
-    };
+	const onAlgoSelect = (newAlgo: string) => {
+		if (cachedKeys[newAlgo + ':' + modeStr])
+			key = cachedKeys[newAlgo + ':' + modeStr];
+		else key = null;
+	};
 
-    onMount(() => {
-        loadFiles(true, true);
-        loadFiles(false, true);
+	const onModeSelect = (newMode: string) => {
+		if (cachedKeys[algoStr + ':' + newMode])
+			key = cachedKeys[algoStr + ':' + newMode];
+		else key = null;
+	};
 
-        const unlisteners: Array<() => void> = [];
+	const onDestLockChange = async () => {
+		if (processFiles.size === 0 && !sourceWatch) return true;
+		return false;
+	};
 
-        const setupListeners = async () => {
-            unlisteners.push(await listen<ProgressFile>("crypto:start", (event) => {
-                if (!processFiles.has(event.payload.filename)) {
-                    processFiles.set(event.payload.filename, {
-                        ...event.payload,
-                        size: event.payload.total
-                    });
-                }
-            }));
+	onMount(() => {
+		loadFiles(true, true);
+		loadFiles(false, true);
 
-            unlisteners.push(await listen<ProgressFile>("crypto:done", (event) => {
-                if (processFiles.has(event.payload.filename)) {
-                    processFiles.delete(event.payload.filename);
-                }
-                loadFiles(false);
-            }));
+		const unlisteners: Array<() => void> = [];
 
-            unlisteners.push(await listen<ProgressFile>("crypto:progress", (event) => {
-                if (processFiles.has(event.payload.filename)) {
-                    processFiles.set(event.payload.filename, {
-                        ...event.payload,
-                        size: event.payload.total
-                    });
-                }
-            }));
+		const setupListeners = async () => {
+			unlisteners.push(
+				await listen<ProgressFile>('crypto:start', (event) => {
+					if (!processFiles.has(event.payload.filename)) {
+						processFiles.set(event.payload.filename, {
+							...event.payload,
+							size: event.payload.total
+						});
+					}
+				})
+			);
 
-            unlisteners.push(await listen<CryptoError>("crypto:error", (event) => {
-                notify.error(event.payload.err, 3000);
-                processFiles.delete(event.payload.filename);
-            }));
+			unlisteners.push(
+				await listen<ProgressFile>('crypto:done', (event) => {
+					if (processFiles.has(event.payload.filename)) {
+						processFiles.delete(event.payload.filename);
+					}
+					loadFiles(false);
+				})
+			);
 
-            unlisteners.push(await listen("fsw:error", (event) => {
-                notify.error(event.payload as string, 3000);
-            }));
-        };
+			unlisteners.push(
+				await listen<ProgressFile>('crypto:progress', (event) => {
+					if (processFiles.has(event.payload.filename)) {
+						processFiles.set(event.payload.filename, {
+							...event.payload,
+							size: event.payload.total
+						});
+					}
+				})
+			);
 
-        setupListeners();
+			unlisteners.push(
+				await listen<CryptoError>('crypto:error', (event) => {
+					notify.error(event.payload.err, 3000);
+					processFiles.delete(event.payload.filename);
+				})
+			);
 
-        return () => {
-            unlisteners.forEach(fn => fn());
-        };
-    });
+			unlisteners.push(
+				await listen('fsw:error', (event) => {
+					notify.error(event.payload as string, 3000);
+				})
+			);
+		};
+
+		setupListeners();
+
+		return () => {
+			unlisteners.forEach((fn) => fn());
+		};
+	});
 </script>
 
 <div class="flex flex-wrap items-center px-5 py-1">
-    <p class="mr-3">Choose algorithm:</p>
-    <Select.Root type="single" bind:value={algoStr} onValueChange={onAlgoSelect} disabled={operation === 'dec' || processFiles.size !== 0}>
-        <Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
-            {triggerContent}
-        </Select.Trigger>
-        <Select.Content class="bg-bg-2 text-fg-1 border-bg-4">
-            <Select.Group>
-                <Select.Label class="text-fg-3">Stream Ciphers</Select.Label>
-                {#each streamCiphers as cipher}
-                    <Select.Item 
-                        value={cipher.value}
-                        label={cipher.label} 
-                        disabled={algoStr === cipher.value} 
-                        class="hover:text-fg-0 hover:bg-bg-3/50"
-                    >
-                        {cipher.label}
-                    </Select.Item>
-                {/each}
-            </Select.Group>
-            <Select.Group>
-                <Select.Label class="text-fg-3">Block Ciphers</Select.Label>
-                {#each blockCiphers as cipher}
-                    <Select.Item 
-                        value={cipher.value}
-                        label={cipher.label} 
-                        disabled={algoStr === cipher.value} 
-                        class="hover:text-fg-0 hover:bg-bg-3/50"
-                    >
-                        {cipher.label}
-                    </Select.Item>
-                {/each}
-            </Select.Group>
-        </Select.Content>
-    </Select.Root>
-    {#if algoStr.startsWith("block:")}
-        <p class="mx-3">Choose mode:</p>
-        <Select.Root type="single" bind:value={modeStr} onValueChange={onModeSelect} disabled={operation === 'dec' || processFiles.size !== 0}>
-            <Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
-                {triggerContentMode}
-            </Select.Trigger>
-            <Select.Content class="bg-bg-2 text-fg-1 border-bg-4">
-                <Select.Group>
-                    {#each blockModes as blockMode}
-                        <Select.Item 
-                            value={blockMode.value}
-                            label={blockMode.label} 
-                            disabled={modeStr === blockMode.value} 
-                            class="hover:text-fg-0 hover:bg-bg-3/50"
-                        >
-                            {blockMode.label}
-                        </Select.Item>
-                    {/each}
-                </Select.Group>
-            </Select.Content>
-        </Select.Root>
-    {/if}
-    <p class="ml-auto">Key:</p>
-    <p class="mx-2 {key !== null ? "text-primary font-black" : "text-fg-4"}">{key?.label ?? "No key selected"}</p>
-    <KeyDialog algo={algo} mode={mode} bind:outputKey={key} onKeySet={onKeySet} operation={operation} />
-    <p class="mr-2">Operation:</p>
-    <div class="flex border border-bg-4 p-1 rounded-sm gap-2">
-        <button 
-            class="border-2 {operation === 'dec' ? 'border-bg-4' : (processFiles.size > 0 ? 'border-bg-2' : 'border-primary')} p-2 rounded-sm cursor-pointer"
-            onclick={() => processFiles.size === 0 && (operation = 'enc')}
-        >Encryption</button>
-        <button 
-            class="border-2 {operation === 'enc' ? 'border-bg-4' : (processFiles.size > 0 ? 'border-bg-2' : 'border-primary')} p-2 rounded-sm cursor-pointer"
-            onclick={() => processFiles.size === 0 && (operation = 'dec')}
-        >Decryption</button>
-    </div>
-    <button
-        class="bg-primary hover:bg-primary/60 disabled:bg-bg-5 disabled:text-bg-1 dark:disabled:text-fg-3 
-        text-bg-0 dark:text-fg-0 px-4 py-3 rounded-sm ml-3 cursor-pointer transition-colors duration-300"
-        disabled={key === null || selectedFile === null || !destLocked || sourceWatch || processFiles.size !== 0}
-        onclick={() => selectedFile && onFileAction(selectedFile.filename)}
-    >{operation === 'enc' ? 'Encrypt' : 'Decrypt'}</button>
+	<p class="mr-3">Choose algorithm:</p>
+	<Select.Root
+		type="single"
+		bind:value={algoStr}
+		onValueChange={onAlgoSelect}
+		disabled={operation === 'dec' || processFiles.size !== 0 || sourceWatch}
+	>
+		<Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
+			{triggerContent}
+		</Select.Trigger>
+		<Select.Content class="bg-bg-2 text-fg-1 border-bg-4">
+			<Select.Group>
+				<Select.Label class="text-fg-3">Stream Ciphers</Select.Label>
+				{#each streamCiphers as cipher}
+					<Select.Item
+						value={cipher.value}
+						label={cipher.label}
+						disabled={algoStr === cipher.value}
+						class="hover:text-fg-0 hover:bg-bg-3/50"
+					>
+						{cipher.label}
+					</Select.Item>
+				{/each}
+			</Select.Group>
+			<Select.Group>
+				<Select.Label class="text-fg-3">Block Ciphers</Select.Label>
+				{#each blockCiphers as cipher}
+					<Select.Item
+						value={cipher.value}
+						label={cipher.label}
+						disabled={algoStr === cipher.value}
+						class="hover:text-fg-0 hover:bg-bg-3/50"
+					>
+						{cipher.label}
+					</Select.Item>
+				{/each}
+			</Select.Group>
+		</Select.Content>
+	</Select.Root>
+	{#if algoStr.startsWith('block:')}
+		<p class="mx-3">Choose mode:</p>
+		<Select.Root
+			type="single"
+			bind:value={modeStr}
+			onValueChange={onModeSelect}
+			disabled={operation === 'dec' || processFiles.size !== 0 || sourceWatch}
+		>
+			<Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
+				{triggerContentMode}
+			</Select.Trigger>
+			<Select.Content class="bg-bg-2 text-fg-1 border-bg-4">
+				<Select.Group>
+					{#each blockModes as blockMode}
+						<Select.Item
+							value={blockMode.value}
+							label={blockMode.label}
+							disabled={modeStr === blockMode.value}
+							class="hover:text-fg-0 hover:bg-bg-3/50"
+						>
+							{blockMode.label}
+						</Select.Item>
+					{/each}
+				</Select.Group>
+			</Select.Content>
+		</Select.Root>
+	{/if}
+	<p class="ml-auto">Key:</p>
+	<p class="mx-2 {key !== null ? 'text-primary font-black' : 'text-fg-4'}">
+		{key?.label ?? 'No key selected'}
+	</p>
+	<KeyDialog {algo} {mode} bind:outputKey={key} {onKeySet} {operation} />
+	<p class="mr-2">Operation:</p>
+	<div class="border-bg-4 flex gap-2 rounded-sm border p-1">
+		<button
+			class="border-2 {operation === 'dec'
+				? 'border-bg-4'
+				: processFiles.size > 0
+					? 'border-bg-2'
+					: 'border-primary'} cursor-pointer rounded-sm p-2"
+			onclick={() => processFiles.size === 0 && (operation = 'enc')}
+			>Encryption</button
+		>
+		<button
+			class="border-2 {operation === 'enc'
+				? 'border-bg-4'
+				: processFiles.size > 0
+					? 'border-bg-2'
+					: 'border-primary'} cursor-pointer rounded-sm p-2"
+			onclick={() => processFiles.size === 0 && (operation = 'dec')}
+			>Decryption</button
+		>
+	</div>
+	<button
+		class="bg-primary hover:bg-primary/60 disabled:bg-bg-5 disabled:text-bg-1 dark:disabled:text-fg-3
+        text-bg-0 dark:text-fg-0 ml-3 cursor-pointer rounded-sm px-4 py-3 transition-colors duration-300"
+		disabled={key === null ||
+			selectedFile === null ||
+			!destLocked ||
+			sourceWatch ||
+			processFiles.size !== 0}
+		onclick={() => selectedFile && onFileAction(selectedFile.filename)}
+		>{operation === 'enc' ? 'Encrypt' : 'Decrypt'}</button
+	>
 </div>
-<div class="flex flex-1 min-h-0">
-    <div class="flex-1 p-4 min-h-0 overflow-hidden flex flex-col">
-        <FileExplorer 
-            class="h-full" 
-            bind:pwd={sourceCwd}
-            files={sourceFiles} 
-            label={`Source Directory${sourceWatch ? " (Watching)" : ""}`} 
-            bind:locked={sourceWatch}
-            bind:selectedFile={selectedFile}
-            lockIcon={ScanEyeIcon}
-            unlockIcon={EyeOffIcon}
-            onGoBack={async () => await goDirBack(true) }
-            onChangeDir={async dir => await changeDir(dir, true)}
-            onFileAction={onFileAction}
-            onStopProcessingFile={() => {}}
-            onSetAbsolutePath={async newDir => await setAbsolutePath(newDir, true)}
-            onLockChange={onFileSystemWatch}
-            onRefresh={() => loadFiles(true)}
-            constFilter={operation === 'dec' ? /^.*\.enc$/ : undefined}
-            processingFiles={[]}
-            pendingFiles={[]}
-            onAcceptRejectFile={() => {}}
-        />
-    </div>
-    <div class="flex-1 p-4 min-h-0 overflow-hidden flex flex-col">
-        <FileExplorer 
-            class="h-full" 
-            pwd={destCwd} 
-            files={destFiles} 
-            label={`Destination Directory${destLocked ? " (Locked)" : ""}`} 
-            bind:locked={destLocked}
-            selectedFile={null}
-            lockIcon={LockIcon}
-            unlockIcon={LockOpenIcon}
-            onGoBack={() => goDirBack(false) }
-            onChangeDir={dir => changeDir(dir, false)}
-            onFileAction={() => {}}
-            onStopProcessingFile={stopFileEncryption}
-            onSetAbsolutePath={async newDir => await setAbsolutePath(newDir, false)}
-            onLockChange={onDestLockChange}
-            onRefresh={() => loadFiles(false)}
-            constFilter={operation === 'enc' ? /^.*\.enc$/ : undefined}
-            processingFiles={processFilesArray}
-            pendingFiles={[]}
-            onAcceptRejectFile={() => {}}
-        />
-    </div>
+<div class="flex min-h-0 flex-1">
+	<div class="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+		<FileExplorer
+			class="h-full"
+			bind:pwd={sourceCwd}
+			files={sourceFiles}
+			label={`Source Directory${sourceWatch ? ' (Watching)' : ''}`}
+			bind:locked={sourceWatch}
+			bind:selectedFile
+			lockIcon={ScanEyeIcon}
+			unlockIcon={EyeOffIcon}
+			onGoBack={async () => await goDirBack(true)}
+			onChangeDir={async (dir) => await changeDir(dir, true)}
+			{onFileAction}
+			onStopProcessingFile={() => {}}
+			onSetAbsolutePath={async (newDir) => await setAbsolutePath(newDir, true)}
+			onLockChange={onFileSystemWatch}
+			onRefresh={() => loadFiles(true)}
+			constFilter={operation === 'dec' ? /^.*\.enc$/ : undefined}
+			processingFiles={[]}
+			pendingFiles={[]}
+			onAcceptRejectFile={() => {}}
+		/>
+	</div>
+	<div class="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+		<FileExplorer
+			class="h-full"
+			pwd={destCwd}
+			files={destFiles}
+			label={`Destination Directory${destLocked ? ' (Locked)' : ''}`}
+			bind:locked={destLocked}
+			selectedFile={null}
+			lockIcon={LockIcon}
+			unlockIcon={LockOpenIcon}
+			onGoBack={() => goDirBack(false)}
+			onChangeDir={(dir) => changeDir(dir, false)}
+			onFileAction={() => {}}
+			onStopProcessingFile={stopFileEncryption}
+			onSetAbsolutePath={async (newDir) => await setAbsolutePath(newDir, false)}
+			onLockChange={onDestLockChange}
+			onRefresh={() => loadFiles(false)}
+			constFilter={operation === 'enc' ? /^.*\.enc$/ : undefined}
+			processingFiles={processFilesArray}
+			pendingFiles={[]}
+			onAcceptRejectFile={() => {}}
+		/>
+	</div>
 </div>

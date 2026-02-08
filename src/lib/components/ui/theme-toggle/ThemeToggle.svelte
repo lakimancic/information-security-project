@@ -46,12 +46,12 @@
 
 <button
 	onclick={toggleTheme}
-	class="inline-flex items-center justify-center cursor-pointer bg-transparent border-none p-2 rounded-md transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/10 {className}"
+	class="inline-flex cursor-pointer items-center justify-center rounded-md border-none bg-transparent p-2 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/10 {className}"
 	aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
 >
 	{#if isDark}
-		<Sun class="transition-all duration-300 hover:rotate-12 hover:scale-110" />
+		<Sun class="transition-all duration-300 hover:scale-110 hover:rotate-12" />
 	{:else}
-		<Moon class="transition-all duration-300 hover:rotate-12 hover:scale-110" />
+		<Moon class="transition-all duration-300 hover:scale-110 hover:rotate-12" />
 	{/if}
 </button>

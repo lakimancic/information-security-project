@@ -11,19 +11,19 @@
 	import Notifications from '$lib/components/ui/notifications/Notifications.svelte';
 </script>
 
-<main class="h-screen text-fg-0 flex overflow-hidden relative">
+<main class="text-fg-0 relative flex h-screen overflow-hidden">
 	<Background />
 	<Notifications />
 	{#if route.path === '/'}
 		<Welcome />
 	{:else}
 		<NavBar />
-		<div class="flex flex-col flex-1 backdrop-blur-md min-h-0">
+		<div class="flex min-h-0 flex-1 flex-col backdrop-blur-md">
 			<div class="flex h-14 items-center justify-between">
-				<div class="text-3xl font-extrabold tracking-widest mx-5">
+				<div class="mx-5 text-3xl font-extrabold tracking-widest">
 					Kript<span class="text-primary">Ox</span>
 				</div>
-				<ThemeToggle className="mr-3"/>
+				<ThemeToggle className="mr-3" />
 			</div>
 			{#if route.path === '/local'}
 				<LocalFileSystem />
