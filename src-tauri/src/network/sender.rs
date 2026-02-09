@@ -100,7 +100,7 @@ fn send_worker(
         created: Utc::now().to_string(),
         algorithm: request.algorithm.clone(),
         block_mode: request.mode.clone(),
-        hash_algo: None,
+        hash_algo: hash_algo.clone(),
         padding: request.padding.clone(),
     };
 

@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::io::ErrorKind;
 use std::net::{IpAddr, SocketAddr, TcpListener};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
+use std::time::Duration;
 use tauri::Emitter;
 use crate::AppState;
 use crate::crypto::CryptoRequest;
@@ -78,7 +80,7 @@ pub fn start_file_listening(
     port: u16,
 ) -> Result<(), NetworkError> {
     let listener = TcpListener::bind(("0.0.0.0", port))?;
-    listener.set_nonblocking(false)?;
+    listener.set_nonblocking(true)?;
 
     let stop_flag = Arc::new(AtomicBool::new(false));
 
@@ -117,6 +119,9 @@ pub fn start_file_listening(
                             let _ = app.emit("network:error", NetworkError::SocketKeyNotFound(addr.to_string()).to_string());
                         }
                     }
+                }
+                Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(100));
                 }
                 Err(e) => {
                     let _ = app.emit("network:error", e.to_string());
@@ -204,9 +209,7 @@ pub fn start_key_listening(
 
             match listener.accept() {
                 Ok((mut stream, addr)) => {
-                    if thread_stop.load(Ordering::SeqCst) {
-                        break;
-                    }
+                    stream.set_nonblocking(false).ok();
 
                     match read_key_from_stream(&mut stream) {
                         Ok(key) => {
@@ -223,6 +226,9 @@ pub fn start_key_listening(
                     }
 
                     break;
+                }
+                Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(100));
                 }
                 Err(e) => {
                     let _ = app.emit("network:key:error", e.to_string());
@@ -277,3 +283,25 @@ pub fn remove_network_key(
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn stop_receiving(
+    state: tauri::State<AppState>,
+    addr: String,
+) -> Result<(), NetworkError> {
+    let socket: SocketAddr = addr.parse()?;
+
+    let (lock, _) = &*state.recv_jobs;
+    let map = lock
+        .lock()
+        .map_err(|e| NetworkError::NetworkInternalError(e.to_string()))?;
+
+    let ctrl = map
+        .get(&socket)
+        .ok_or(NetworkError::FileIsNotReceiving)?;
+
+    ctrl.cancel.store(true, Ordering::SeqCst);
+
+    Ok(())
+}
+

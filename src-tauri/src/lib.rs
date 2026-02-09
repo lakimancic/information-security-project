@@ -20,7 +20,7 @@ use crate::files::commands::{start_file_watching, stop_file_watching};
 use crate::key_manager::commands::{find_key, find_keys_by_algo, generate_new_key, list_keys, remove_key,
                                    load_keys, save_keys};
 use crate::network::commands::{send_file, send_key, start_file_listening, stop_file_listening, approve_incoming, deny_incoming,
-                               start_key_listening, stop_key_listening, get_network_keys, remove_network_key, stop_sending};
+                               start_key_listening, stop_key_listening, get_network_keys, remove_network_key, stop_sending, stop_receiving};
 use crate::files::file_explorer::FileExplorer;
 use crate::files::watch::WatcherState;
 use crate::jobs::{JobRegistry, ListenerControl, ReceiverRegistry};
@@ -90,7 +90,7 @@ pub fn run() {
             encrypt_file, stop_processing, decrypt_file,
             stop_file_watching, start_file_watching,
             send_file, send_key, stop_sending,
-            start_file_listening, stop_file_listening, approve_incoming, deny_incoming,
+            start_file_listening, stop_file_listening, approve_incoming, deny_incoming, stop_receiving,
             start_key_listening, stop_key_listening, get_network_keys, remove_network_key
         ])
         .run(tauri::generate_context!())

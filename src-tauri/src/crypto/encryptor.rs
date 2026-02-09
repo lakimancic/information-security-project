@@ -166,7 +166,7 @@ impl Encryptor {
 
     pub fn padded_size(&self, size: usize) -> u64 {
         if let CipherInstance::Block { ref cipher, mode: _, ref padding } = self.cipher {
-            padding.pad_size(size, cipher.block_size()) as u64
+            (size + padding.pad_size(size, cipher.block_size())) as u64
         }
         else {
             size as u64

@@ -8,9 +8,9 @@ use serde::Serialize;
 use tauri::Emitter;
 use crate::crypto::{CryptoMetadata, CryptoRequest};
 use crate::crypto::encryptor::Encryptor;
-use crate::crypto::errors::CryptoErrorEvent;
+use crate::crypto::errors::{CryptoError, CryptoErrorEvent};
 use crate::crypto::hash_factory::HashFactory;
-use crate::hash_wrappers::HashWriter;
+use crate::hash_wrappers::{HashReader};
 use crate::jobs::{PendingControl, ReceiverRegistry};
 use crate::key_manager::key::PlainKey;
 use crate::network::errors::NetworkError;
@@ -34,6 +34,22 @@ pub fn spawn_recv_worker(
     key: PlainKey,
 ) {
     let cancel = Arc::new(AtomicBool::new(false));
+
+    {
+        let (lock, cvar) = &*registry;
+        let mut map = lock.lock().unwrap();
+
+        map.insert(
+            addr,
+            PendingControl {
+                approved: false,
+                canceled: false,
+                cancel: cancel.clone(),
+            },
+        );
+
+        cvar.notify_all();
+    }
 
     thread::spawn(move || {
         let result = recv_worker(
@@ -74,18 +90,6 @@ fn recv_worker(
     metadata_bytes.pop();
 
     let metadata: CryptoMetadata = serde_json::from_slice(&metadata_bytes)?;
-    {
-        let (lock, _) = &*registry;
-        let mut map = lock.lock().unwrap();
-
-        map.insert(
-            addr,
-            PendingControl {
-                approved: false,
-                canceled: false,
-            },
-        );
-    }
     app.emit("network:recv:pending", PendingFile {
         filename: metadata.filename.clone(),
         sock_addr: addr,
@@ -175,15 +179,15 @@ fn recv_decrypt_worker(
             Some(hash_algo) => Some(HashFactory::create(&hash_algo)?),
             None => None,
         };
-        let mut hash_writer = HashWriter::new(&mut writer, hash_function);
 
         let mut encryptor = Encryptor::new(request)?;
         let take_size = encryptor.padded_size(total);
 
         let mut limited_reader = buffered_reader.take(take_size);
-        encryptor.decrypt(&mut limited_reader, &mut hash_writer)?;
+        let mut hash_reader = HashReader::new(&mut limited_reader, hash_function);
+        encryptor.decrypt(&mut hash_reader, &mut writer)?;
 
-        if let Some(hash) = hash_writer.finalize_hash() {
+        if let Some(hash) = hash_reader.finalize_hash() {
             let real_hash = hash?;
             let mut expected_hash = vec![0u8; real_hash.len()];
             buffered_reader.read_exact(&mut expected_hash)?;

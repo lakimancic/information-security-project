@@ -16,6 +16,7 @@ pub struct ListenerControl {
 pub struct PendingControl {
     pub approved: bool,
     pub canceled: bool,
+    pub cancel: Arc<AtomicBool>,
 }
 
 pub type ReceiverRegistry =

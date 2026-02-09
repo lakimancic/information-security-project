@@ -191,21 +191,21 @@
 	const onFileSystemWatch = async (locked: boolean): Promise<boolean> => {
 		if (key === null) {
 			notify.warning('Key is not selected', 3000);
-			return;
+			return false;
 		}
 
 		if (operation === 'enc') {
 			if (algo === null) {
 				notify.warning('Algorithm is not selected', 3000);
-				return;
+				return false;
 			} else if (algoStr.startsWith('block:') && mode === null) {
 				notify.warning('Block mode is not selected', 3000);
-				return;
+				return false;
 			}
 		}
 		else {
 			notify.warning('File System Watching supports only encryption', 3000);
-			return;
+			return false;
 		}
 
 		if (!destLocked) {
@@ -213,7 +213,7 @@
 				`Before watching file system, destination directory must be locked.`,
 				3000
 			);
-			return;
+			return false;
 		}
 
 		if (!locked) {

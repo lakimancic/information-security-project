@@ -37,6 +37,7 @@
 
 	let sendingFiles = $state<SvelteMap<string, ProgressFile>>(new SvelteMap());
 	let receivingFiles = $state<SvelteMap<string, ProgressFile>>(new SvelteMap());
+	let recvCache = $state<SvelteMap<string, string>>(new SvelteMap());
 
 	let algoStr = $state('');
 	let modeStr = $state('');
@@ -172,15 +173,15 @@
 				mode: mode ? modeStr : undefined,
 				key: key.key,
 				iv: key.iv,
-				hash_algo: hashStr,
 				padding: mode ? 'pkcs7' : undefined
 			},
 			file: filename,
 			ip: sendIp,
-			port: sendPort
+			port: sendPort,
+			hashAlgo: hashStr
 		})
 			.then(() => {
-				notify.success('File sent successfully.', 3000);
+				notify.info('File started sending.', 3000);
 			})
 			.catch((err: any) => {
 				notify.error(err.message, 3000);
@@ -254,6 +255,27 @@
 			});
 	};
 
+	const stopFileSending = async (filename: string) => {
+		invoke('stop_sending', { filename })
+			.then(() => {
+				sendingFiles.delete(filename);
+			})
+			.catch((err) => {
+				notify.error(err, 3000);
+			});
+	};
+
+	const stopFileReceiving = async (addr: string) => {
+		invoke('stop_receiving', { addr })
+			.then(() => {
+				receivingFiles.delete(recvCache.get(addr) ?? '');
+				recvCache.delete(addr);
+			})
+			.catch((err) => {
+				notify.error(err, 3000);
+			});
+	};
+
 	onMount(() => {
 		loadFiles(true, true);
 		loadFiles(false, true);
@@ -274,9 +296,8 @@
 
 			unlisteners.push(
 				await listen<ProgressFile>('network:send:done', (event) => {
-					if (sendingFiles.has(event.payload.filename)) {
-						sendingFiles.delete(event.payload.filename);
-					}
+					sendingFiles.delete(event.payload.filename);
+					notify.success('File sent successfully', 3000);
 				})
 			);
 
@@ -293,9 +314,7 @@
 
 			unlisteners.push(
 				await listen<CryptoError>('network:send:error', (event) => {
-					if (sendingFiles.has(event.payload.filename)) {
-						sendingFiles.delete(event.payload.filename);
-					}
+					sendingFiles.delete(event.payload.filename);
 					notify.error(event.payload.err, 3000);
 				})
 			);
@@ -315,13 +334,19 @@
 			);
 
 			unlisteners.push(
+				await listen('network:key:error', (event) => {
+					keyListening = false;
+					notify.error(event.payload as any, 3000);
+				})
+			);
+
+			unlisteners.push(
 				await listen<CryptoError>('network:recv:error', (event) => {
 					recvQueue = recvQueue.filter(
 						(pf) => pf.sockAddr !== event.payload.filename
 					);
-					if (receivingFiles.has(event.payload.filename)) {
-						receivingFiles.delete(event.payload.filename);
-					}
+					receivingFiles.delete(recvCache.get(event.payload.filename) ?? '');
+					recvCache.delete(event.payload.filename);
 					notify.error(event.payload.err, 3000);
 				})
 			);
@@ -329,12 +354,14 @@
 			unlisteners.push(
 				await listen<PendingFile>('network:recv:pending', (event) => {
 					recvQueue.push(event.payload);
+					recvCache.set(event.payload.sockAddr, event.payload.filename);
 				})
 			);
 
 			unlisteners.push(
 				await listen<string>('network:recv:denied', (event) => {
 					recvQueue = recvQueue.filter((pf) => pf.sockAddr !== event.payload);
+					recvCache.delete(event.payload);
 				})
 			);
 
@@ -354,9 +381,7 @@
 
 			unlisteners.push(
 				await listen<ProgressFile>('network:recv:done', (event) => {
-					if (receivingFiles.has(event.payload.filename)) {
-						receivingFiles.delete(event.payload.filename);
-					}
+					receivingFiles.delete(event.payload.filename);
 					loadFiles(false);
 				})
 			);
@@ -497,7 +522,7 @@
 			<input
 				type="number"
 				class="border-bg-5 data-[placeholder]:text-fg-3 w-40
-            	[appearance:textfield] rounded-md border px-3 py-1 outline-none [&::-webkit-inner-spin-button]:appearance-none 
+            	[appearance:textfield] rounded-md border px-3 py-1 outline-none [&::-webkit-inner-spin-button]:appearance-none
 				[&::-webkit-outer-spin-button]:appearance-none"
 				placeholder="443"
 				bind:value={sendPort}
@@ -549,7 +574,7 @@
 				onGoBack={async () => await goDirBack(true)}
 				onChangeDir={async (dir) => await changeDir(dir, true)}
 				{onFileAction}
-				onStopProcessingFile={() => {}}
+				onStopProcessingFile={stopFileSending}
 				onSetAbsolutePath={async (newDir) =>
 					await setAbsolutePath(newDir, true)}
 				onLockChange={async () => true}
@@ -566,7 +591,7 @@
 			<p>File Listen Port:</p>
 			<input
 				type="number"
-				class="border-bg-5 data-[placeholder]:text-fg-3 disabled:text-fg-2 w-40 [appearance:textfield] 
+				class="border-bg-5 data-[placeholder]:text-fg-3 disabled:text-fg-2 w-40 [appearance:textfield]
 				rounded-md border px-3 py-1 outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 				disabled={fileListening}
 				placeholder="443"
@@ -575,7 +600,7 @@
 			<p>Key Listen Port:</p>
 			<input
 				type="number"
-				class="border-bg-5 data-[placeholder]:text-fg-3 disabled:text-fg-2 w-40 [appearance:textfield] 
+				class="border-bg-5 data-[placeholder]:text-fg-3 disabled:text-fg-2 w-40 [appearance:textfield]
 				rounded-md border px-3 py-1 outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 				disabled={keyListening}
 				placeholder="443"
@@ -650,7 +675,7 @@
 				onGoBack={async () => await goDirBack(false)}
 				onChangeDir={async (dir) => await changeDir(dir, false)}
 				{onFileAction}
-				onStopProcessingFile={() => {}}
+				onStopProcessingFile={stopFileReceiving}
 				onSetAbsolutePath={async (newDir) =>
 					await setAbsolutePath(newDir, false)}
 				onLockChange={async () => true}
