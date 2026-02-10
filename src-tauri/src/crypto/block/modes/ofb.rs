@@ -28,6 +28,8 @@ impl BlockMode for OfbMode {
         Ok(())
     }
 
+    fn needs_padding(&self) -> bool { false }
+
     fn reset(&mut self) -> Result<(), CryptoError> {
         self.state = self.iv.clone();
         Ok(())

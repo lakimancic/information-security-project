@@ -34,5 +34,8 @@ const blockModes: CipherTag[] = [
 const hashModes: CipherTag[] = [
 	{ value: 'blake256', label: 'BLAKE-256' }];
 
+const padModes: CipherTag[] = [
+	{ value: 'pkcs7', label: 'PKCS-7'}];
+
 export type { Key, CipherTag, ShortKey, CryptoError };
-export { streamCiphers, blockCiphers, blockModes, hashModes };
+export { streamCiphers, blockCiphers, blockModes, hashModes, padModes };

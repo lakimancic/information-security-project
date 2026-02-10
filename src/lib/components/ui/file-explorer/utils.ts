@@ -60,20 +60,21 @@ export function typeToIcon(type: string) {
 }
 
 export function sizeToString(size: number) {
-	let tmpSize = size;
-	if (tmpSize < 1000) {
-		return `${tmpSize} B`;
-	}
-	tmpSize = Math.round(tmpSize / 100) / 10;
-	if (tmpSize < 1000) {
-		return `${tmpSize} kB`;
-	}
-	tmpSize = Math.round(tmpSize / 100) / 10;
-	if (tmpSize < 1000) {
-		return `${tmpSize} MB`;
-	}
-	tmpSize = Math.round(tmpSize / 1000) / 10;
-	return `${tmpSize} GB`;
+    if (size === 0) return "0 B";
+    
+    const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+    
+    if (size < 1024) {
+        return `${size} B`;
+    }
+    
+    const i = Math.floor(Math.log2(size) / 10);
+    const unit = units[Math.min(i, units.length - 1)];
+    const value = size / Math.pow(1024, Math.min(i, units.length - 1));
+    const rounded = Math.round(value * 10) / 10;
+    const formatted = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
+    
+    return `${formatted} ${unit}`;
 }
 
 export type { LocalFile, ProgressFile, PendingFile };

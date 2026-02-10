@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use std::net::{SocketAddr};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
 
 pub struct CryptoJob {
@@ -13,11 +12,13 @@ pub struct ListenerControl {
     pub stop: Arc<AtomicBool>,
 }
 
-pub struct PendingControl {
-    pub approved: bool,
-    pub canceled: bool,
-    pub cancel: Arc<AtomicBool>,
+pub struct JobGuard {
+    pub(crate) registry: JobRegistry,
+    pub(crate) filename: String,
 }
 
-pub type ReceiverRegistry =
-    Arc<(Mutex<HashMap<SocketAddr, PendingControl>>, Condvar)>;
+impl Drop for JobGuard {
+    fn drop(&mut self) {
+        self.registry.lock().unwrap().remove(&self.filename);
+    }
+}

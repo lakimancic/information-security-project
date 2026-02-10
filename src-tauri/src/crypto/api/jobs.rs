@@ -75,7 +75,7 @@ where
         if let Err(err) = result {
             let _ = app.emit("crypto:error", CryptoErrorEvent {
                 err: err.to_string(),
-                filename,
+                filename: make_output_name(&filename),
             });
         }
     });

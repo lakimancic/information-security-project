@@ -11,7 +11,8 @@
 		blockModes,
 		type CryptoError,
 		streamCiphers,
-		type Key
+		type Key,
+		padModes
 	} from '$lib/types/crypto';
 	import {
 		EyeOffIcon,
@@ -35,6 +36,7 @@
 
 	let algoStr = $state('');
 	let modeStr = $state('');
+	let padStr = $state('');
 
 	let operation = $state<'dec' | 'enc'>('enc');
 	let key = $state<Key | null>(null);
@@ -67,6 +69,10 @@
 
 	const triggerContentMode = $derived(
 		blockModes.find((m) => m.value === modeStr)?.label ?? 'Select Mode'
+	);
+
+	const triggerContentPad = $derived(
+		padModes.find((m) => m.value === padStr)?.label ?? 'Select Padding'
 	);
 
 	const loadFiles = async (source: boolean, reset: boolean = false) => {
@@ -150,7 +156,7 @@
 					mode: mode ? modeStr : undefined,
 					key: key.key,
 					iv: key.iv,
-					padding: mode ? 'pkcs7' : undefined
+					padding: padStr.length === 0 ? undefined : padStr
 				},
 				file: filename
 			});
@@ -179,9 +185,7 @@
 			encrypt: operation === 'enc'
 		})
 			.then(() => {
-				if (processFiles.has(filename)) {
-					processFiles.delete(filename);
-				}
+				processFiles.delete(realFilename);
 			})
 			.catch((err) => {
 				notify.error(err, 3000);
@@ -202,8 +206,7 @@
 				notify.warning('Block mode is not selected', 3000);
 				return false;
 			}
-		}
-		else {
+		} else {
 			notify.warning('File System Watching supports only encryption', 3000);
 			return false;
 		}
@@ -327,6 +330,9 @@
 		setupListeners();
 
 		return () => {
+			[...processFiles.values()].forEach((file) =>
+				stopFileEncryption(file.filename)
+			);
 			unlisteners.forEach((fn) => fn());
 		};
 	});
@@ -393,6 +399,38 @@
 							class="hover:text-fg-0 hover:bg-bg-3/50"
 						>
 							{blockMode.label}
+						</Select.Item>
+					{/each}
+				</Select.Group>
+			</Select.Content>
+		</Select.Root>
+		<p class="mx-3">Choose padding:</p>
+		<Select.Root
+			type="single"
+			bind:value={padStr}
+			disabled={operation === 'dec' || processFiles.size !== 0 || sourceWatch}
+		>
+			<Select.Trigger class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40">
+				{triggerContentPad}
+			</Select.Trigger>
+			<Select.Content class="bg-bg-2 text-fg-1 border-bg-4">
+				<Select.Group>
+					<Select.Item
+						value=""
+						label="None"
+						disabled={padStr === ''}
+						class="hover:text-fg-0 hover:bg-bg-3/50"
+					>
+						None
+					</Select.Item>
+					{#each padModes as padMode}
+						<Select.Item
+							value={padMode.value}
+							label={padMode.label}
+							disabled={modeStr === padMode.value}
+							class="hover:text-fg-0 hover:bg-bg-3/50"
+						>
+							{padMode.label}
 						</Select.Item>
 					{/each}
 				</Select.Group>

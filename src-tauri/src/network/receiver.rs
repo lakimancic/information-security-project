@@ -4,54 +4,29 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::thread;
-use serde::Serialize;
 use tauri::Emitter;
 use crate::crypto::{CryptoMetadata, CryptoRequest};
 use crate::crypto::encryptor::Encryptor;
-use crate::crypto::errors::{CryptoError, CryptoErrorEvent};
+use crate::crypto::errors::{CryptoErrorEvent};
 use crate::crypto::hash_factory::HashFactory;
 use crate::hash_wrappers::{HashReader};
-use crate::jobs::{PendingControl, ReceiverRegistry};
+use crate::jobs::{CryptoJob, JobGuard, JobRegistry};
 use crate::key_manager::key::PlainKey;
 use crate::network::errors::NetworkError;
 use crate::progress::{CryptoProgress, ProgressWriter};
 
 
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct PendingFile {
-    filename: String,
-    sock_addr: SocketAddr,
-    size: usize,
-}
-
 pub fn spawn_recv_worker(
     app: tauri::AppHandle,
-    registry: ReceiverRegistry,
+    registry: JobRegistry,
     stream: TcpStream,
     output_path: PathBuf,
     addr: SocketAddr,
     key: PlainKey,
 ) {
-    let cancel = Arc::new(AtomicBool::new(false));
-
-    {
-        let (lock, cvar) = &*registry;
-        let mut map = lock.lock().unwrap();
-
-        map.insert(
-            addr,
-            PendingControl {
-                approved: false,
-                canceled: false,
-                cancel: cancel.clone(),
-            },
-        );
-
-        cvar.notify_all();
-    }
-
     thread::spawn(move || {
+        let cancel = Arc::new(AtomicBool::new(false));
+
         let result = recv_worker(
             app.clone(),
             stream,
@@ -79,7 +54,7 @@ fn recv_worker(
     stream: TcpStream,
     addr: SocketAddr,
     output_path: PathBuf,
-    registry: ReceiverRegistry,
+    registry: JobRegistry,
     key: PlainKey,
     cancel: Arc<AtomicBool>,
 ) -> Result<(), NetworkError> {
@@ -90,27 +65,22 @@ fn recv_worker(
     metadata_bytes.pop();
 
     let metadata: CryptoMetadata = serde_json::from_slice(&metadata_bytes)?;
-    app.emit("network:recv:pending", PendingFile {
-        filename: metadata.filename.clone(),
-        sock_addr: addr,
-        size: metadata.size,
-    })?;
     tracing::info!("Receiving file {} from: {}", metadata.filename, addr);
+    tracing::info!("Crypto Metadata: {:?}", metadata);
 
-    let (lock, cvar) = &*registry;
-    let mut map = lock.lock().unwrap();
+    registry.lock().unwrap().insert(
+        metadata.filename.clone(),
+        CryptoJob { cancel: cancel.clone() },
+    );
 
-    while !map[&addr].approved && !map[&addr].canceled {
-        map = cvar.wait(map).unwrap();
+    let _guard = JobGuard {
+        registry: registry.clone(),
+        filename: metadata.filename.clone(),
+    };
+
+    if cancel.load(std::sync::atomic::Ordering::SeqCst) {
+        return Err(NetworkError::CancelledBeforeStart);
     }
-
-    if map[&addr].canceled {
-        app.emit("network:recv:denied", addr)?;
-        tracing::info!("Receiving file {} denied.", metadata.filename);
-        return Ok(());
-    }
-
-    drop(map);
 
     let mut output_path = output_path.clone();
     output_path.push(&metadata.filename);
@@ -130,6 +100,7 @@ fn recv_worker(
         }
         Err(err) => {
             tracing::error!("Receiving file failed: {}", output_path.display());
+            tracing::error!("Receive error: {}", err);
             Err(err)
         }
     }
@@ -153,18 +124,18 @@ fn recv_decrypt_worker(
             .unwrap_or("tmp")
     ));
 
-    let tmp_output = std::fs::File::create(&tmp_file_path)?;
+    let result: Result<(), NetworkError> = (|| {
+        let tmp_output = std::fs::File::create(&tmp_file_path)?;
 
-    let _ = app.emit(
-        "network:recv:start",
-        CryptoProgress {
-            filename: filename.clone(),
-            processed: 0,
-            total,
-        },
-    );
+        let _ = app.emit(
+            "network:recv:start",
+            CryptoProgress {
+                filename: filename.clone(),
+                processed: 0,
+                total,
+            },
+        );
 
-    let result: Result<(), NetworkError> = {
         let mut writer = ProgressWriter {
             inner: tmp_output,
             processed: 0,
@@ -176,7 +147,7 @@ fn recv_decrypt_worker(
         };
 
         let hash_function = match hash_algo {
-            Some(hash_algo) => Some(HashFactory::create(&hash_algo)?),
+            Some(algo) => Some(HashFactory::create(&algo)?),
             None => None,
         };
 
@@ -185,6 +156,7 @@ fn recv_decrypt_worker(
 
         let mut limited_reader = buffered_reader.take(take_size);
         let mut hash_reader = HashReader::new(&mut limited_reader, hash_function);
+
         encryptor.decrypt(&mut hash_reader, &mut writer)?;
 
         if let Some(hash) = hash_reader.finalize_hash() {
@@ -193,38 +165,53 @@ fn recv_decrypt_worker(
             buffered_reader.read_exact(&mut expected_hash)?;
 
             if expected_hash != real_hash {
-                tracing::warn!("Hash verification failed");
+                tracing::warn!("Hash verification failed: {:x?} {:x?}", real_hash, expected_hash);
                 return Err(NetworkError::HashVerificationFailed);
             }
         }
 
+        if cancel.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Interrupted,
+                "Receiving cancelled",
+            )
+                .into());
+        }
+
+        std::fs::rename(&tmp_file_path, output_file)?;
+
+        app.emit(
+            "network:recv:done",
+            CryptoProgress {
+                filename,
+                processed: total,
+                total,
+            },
+        )?;
+
+        tracing::info!("File successfully received: {}", output_file.display());
         Ok(())
-    };
+    })();
 
-    if let Err(e) = result {
+    if result.is_err() {
         let _ = std::fs::remove_file(&tmp_file_path);
-        return Err(NetworkError::from(e));
     }
 
-    if cancel.load(std::sync::atomic::Ordering::SeqCst) {
-        let _ = std::fs::remove_file(&tmp_file_path);
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Interrupted,
-            "Receiving cancelled",
-        )
-            .into());
+    if let Err(err) = result {
+        let _ = app.emit(
+            "network:recv:error",
+            CryptoErrorEvent {
+                err: err.to_string(),
+                filename: output_file.file_name().unwrap().to_str().unwrap().to_string(),
+            },
+        );
+        Err(err)
     }
-
-    std::fs::rename(&tmp_file_path, output_file)?;
-
-    app.emit("network:recv:done", CryptoProgress {
-        filename,
-        processed: total,
-        total,
-    })?;
-
-    Ok(())
+    else {
+        result
+    }
 }
+
 
 pub fn read_key_from_stream(stream: &mut TcpStream) -> Result<PlainKey, NetworkError> {
     use std::io::{Read};

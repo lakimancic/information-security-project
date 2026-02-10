@@ -16,6 +16,9 @@ pub enum NetworkError {
     #[error("File is not receiving")]
     FileIsNotReceiving,
 
+    #[error("File is cancelled before started")]
+    CancelledBeforeStart,
+
     #[error("Hash verification failed")]
     HashVerificationFailed,
 
@@ -46,6 +49,7 @@ enum NetworkErrorName {
     NetworkInternalError(String),
     FileIsNotSending(String),
     FileIsNotReceiving(String),
+    CancelledBeforeStart(String),
     Io(String),
     Other(String),
     Json(String),
@@ -69,6 +73,7 @@ impl serde::Serialize for NetworkError {
             }
             Self::FileIsNotSending => NetworkErrorName::FileIsNotSending(message),
             Self::FileIsNotReceiving => NetworkErrorName::FileIsNotReceiving(message),
+            Self::CancelledBeforeStart => NetworkErrorName::CancelledBeforeStart(message),
             Self::HashVerificationFailed => NetworkErrorName::HashVerificationFailed(message),
             Self::Io(_) => NetworkErrorName::Io(message),
             Self::Other(_) => NetworkErrorName::Other(message),

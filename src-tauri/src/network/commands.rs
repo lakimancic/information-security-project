@@ -142,55 +142,13 @@ pub fn stop_file_listening(state: tauri::State<AppState>) {
 }
 
 #[tauri::command]
-pub fn approve_incoming(
-    state: tauri::State<AppState>,
-    addr: String,
-) -> Result<(), NetworkError> {
-    let socket: SocketAddr = addr.parse()?;
-
-    let (lock, cvar) = &*state.recv_jobs;
-
-    let mut map = lock
-        .lock()
-        .map_err(|e| NetworkError::NetworkInternalError(e.to_string()))?;
-
-    if let Some(ctrl) = map.get_mut(&socket) {
-        ctrl.approved = true;
-    }
-
-    cvar.notify_all();
-    Ok(())
-}
-
-#[tauri::command]
-pub fn deny_incoming(
-    state: tauri::State<AppState>,
-    addr: String,
-) -> Result<(), NetworkError> {
-    let socket: SocketAddr = addr.parse()?;
-
-    let (lock, cvar) = &*state.recv_jobs;
-
-    let mut map = lock
-        .lock()
-        .map_err(|e| NetworkError::NetworkInternalError(e.to_string()))?;
-
-    if let Some(ctrl) = map.get_mut(&socket) {
-        ctrl.canceled = true;
-    }
-
-    cvar.notify_all();
-    Ok(())
-}
-
-#[tauri::command]
 pub fn start_key_listening(
     state: tauri::State<AppState>,
     app: tauri::AppHandle,
     port: u16,
 ) -> Result<(), NetworkError> {
     let listener = TcpListener::bind(("0.0.0.0", port))?;
-    listener.set_nonblocking(false)?;
+    listener.set_nonblocking(true)?;
     let stop_flag = {
         let mut ctrl = state.key_listener.lock()
             .map_err(|err| NetworkError::NetworkInternalError(err.to_string()))?;
@@ -287,20 +245,16 @@ pub fn remove_network_key(
 #[tauri::command]
 pub fn stop_receiving(
     state: tauri::State<AppState>,
-    addr: String,
+    filename: String,
 ) -> Result<(), NetworkError> {
-    let socket: SocketAddr = addr.parse()?;
-
-    let (lock, _) = &*state.recv_jobs;
-    let map = lock
-        .lock()
+    let jobs = state.recv_jobs.lock()
         .map_err(|e| NetworkError::NetworkInternalError(e.to_string()))?;
 
-    let ctrl = map
-        .get(&socket)
+    let job = jobs
+        .get(&filename)
         .ok_or(NetworkError::FileIsNotReceiving)?;
 
-    ctrl.cancel.store(true, Ordering::SeqCst);
+    job.cancel.store(true, Ordering::SeqCst);
 
     Ok(())
 }

@@ -14,11 +14,11 @@ impl A51Cipher {
         if key.len() != 8 {
             return Err(CryptoError::InvalidKeyLength);
         }
-        let key_num = u64::from_le_bytes(key[0..8].try_into().unwrap());
+        let key_num = u64::from_be_bytes(key[0..8].try_into().unwrap());
         Ok(Self {
             x: (key_num >> 45) as u32,
             y: ((key_num >> 23) & 0x3fffff) as u32,
-            z: (key_num & 0x7ffff) as u32,
+            z: (key_num & 0x7fffff) as u32,
             key: key_num,
         })
     }
@@ -92,7 +92,7 @@ impl StreamCipher for A51Cipher {
     fn reset(&mut self) -> Result<(), CryptoError> {
         self.x = (self.key >> 45) as u32;
         self.y = ((self.key >> 23) & 0x3fffff) as u32;
-        self.z = (self.key & 0x7ffff) as u32;
+        self.z = (self.key & 0x7fffff) as u32;
         Ok(())
     }
 }

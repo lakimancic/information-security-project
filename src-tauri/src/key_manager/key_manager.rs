@@ -48,7 +48,7 @@ impl KeyManager {
         let mut cipher = Encryptor::from_instance(CipherInstance::Block {
             cipher: Box::new(AES256::new(hash)?),
             mode: Box::new(OfbMode::new(vec![0; 16])),
-            padding: Box::new(Pkcs7)
+            padding: Some(Box::new(Pkcs7))
         });
 
         let mut input = Cursor::new(message);
@@ -81,7 +81,7 @@ impl KeyManager {
         let mut cipher = Encryptor::from_instance(CipherInstance::Block {
             cipher: Box::new(AES256::new(hash.clone())?),
             mode: Box::new(OfbMode::new(vec![0; 16])),
-            padding: Box::new(Pkcs7)
+            padding: Some(Box::new(Pkcs7))
         });
 
         cipher.decrypt(&mut input, &mut output).map_err(|_| KeysError::InvalidPassword)?;

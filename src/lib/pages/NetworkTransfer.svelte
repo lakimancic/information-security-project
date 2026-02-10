@@ -13,7 +13,10 @@
 		type CryptoError,
 		hashModes,
 		streamCiphers,
-		type Key
+		type Key,
+
+		padModes
+
 	} from '$lib/types/crypto';
 	import KeyDialog from '$lib/components/ui/key-dialog/KeyDialog.svelte';
 	import type {
@@ -33,15 +36,13 @@
 	let recvFiles: LocalFile[] = $state([]);
 	let recvCwd: string = $state('');
 
-	let recvQueue: PendingFile[] = $state([]);
-
 	let sendingFiles = $state<SvelteMap<string, ProgressFile>>(new SvelteMap());
 	let receivingFiles = $state<SvelteMap<string, ProgressFile>>(new SvelteMap());
-	let recvCache = $state<SvelteMap<string, string>>(new SvelteMap());
 
 	let algoStr = $state('');
 	let modeStr = $state('');
 	let hashStr = $state('');
+	let padStr = $state('');
 
 	let sendIp = $state('');
 	let sendPort = $state('');
@@ -91,6 +92,10 @@
 
 	const triggerContentHash = $derived(
 		hashModes.find((h) => h.value === hashStr)?.label ?? 'Select Hash'
+	);
+
+	const triggerContentPad = $derived(
+		padModes.find((m) => m.value === padStr)?.label ?? 'Select Padding'
 	);
 
 	const onKeySet = (newKey: Key) => {
@@ -173,12 +178,12 @@
 				mode: mode ? modeStr : undefined,
 				key: key.key,
 				iv: key.iv,
-				padding: mode ? 'pkcs7' : undefined
+				padding: padStr.length === 0 ? undefined : padStr
 			},
 			file: filename,
 			ip: sendIp,
 			port: sendPort,
-			hashAlgo: hashStr
+			hashAlgo: hashStr.length === 0 ? undefined : hashStr
 		})
 			.then(() => {
 				notify.info('File started sending.', 3000);
@@ -228,8 +233,8 @@
 				if (files) fileListening = true;
 				else keyListening = true;
 			})
-			.catch((err) => {
-				notify.error(err, 3000);
+			.catch((err: any) => {
+				notify.error(err.message, 3000);
 			});
 	};
 
@@ -242,16 +247,8 @@
 				if (file) fileListening = false;
 				else keyListening = false;
 			})
-			.catch((err) => {
-				notify.error(err, 3000);
-			});
-	};
-
-	const approveDenyFile = (sockAddr: string, accept: boolean) => {
-		invoke(accept ? 'approve_incoming' : 'deny_incoming', { addr: sockAddr })
-			.then(() => {})
-			.catch((err) => {
-				notify.error(err, 3000);
+			.catch((err: any) => {
+				notify.error(err.message, 3000);
 			});
 	};
 
@@ -260,19 +257,19 @@
 			.then(() => {
 				sendingFiles.delete(filename);
 			})
-			.catch((err) => {
-				notify.error(err, 3000);
+			.catch((err: any) => {
+				notify.error(err.message, 3000);
 			});
 	};
 
-	const stopFileReceiving = async (addr: string) => {
-		invoke('stop_receiving', { addr })
-			.then(() => {
-				receivingFiles.delete(recvCache.get(addr) ?? '');
-				recvCache.delete(addr);
+	const stopFileReceiving = async (filename: string) => {
+		invoke('stop_receiving', { filename })
+			.then(() => {})
+			.catch((err: any) => {
+				notify.error(err.message, 3000);
 			})
-			.catch((err) => {
-				notify.error(err, 3000);
+			.finally(() => {
+				receivingFiles.delete(filename);
 			});
 	};
 
@@ -329,6 +326,7 @@
 
 			unlisteners.push(
 				await listen('network:error', (event) => {
+					console.log(event.payload)
 					notify.error(event.payload as any, 3000);
 				})
 			);
@@ -342,34 +340,13 @@
 
 			unlisteners.push(
 				await listen<CryptoError>('network:recv:error', (event) => {
-					recvQueue = recvQueue.filter(
-						(pf) => pf.sockAddr !== event.payload.filename
-					);
-					receivingFiles.delete(recvCache.get(event.payload.filename) ?? '');
-					recvCache.delete(event.payload.filename);
+					receivingFiles.delete(event.payload.filename);
 					notify.error(event.payload.err, 3000);
 				})
 			);
 
 			unlisteners.push(
-				await listen<PendingFile>('network:recv:pending', (event) => {
-					recvQueue.push(event.payload);
-					recvCache.set(event.payload.sockAddr, event.payload.filename);
-				})
-			);
-
-			unlisteners.push(
-				await listen<string>('network:recv:denied', (event) => {
-					recvQueue = recvQueue.filter((pf) => pf.sockAddr !== event.payload);
-					recvCache.delete(event.payload);
-				})
-			);
-
-			unlisteners.push(
 				await listen<ProgressFile>('network:recv:start', (event) => {
-					recvQueue = recvQueue.filter(
-						(pf) => pf.filename !== event.payload.filename
-					);
 					if (!receivingFiles.has(event.payload.filename)) {
 						receivingFiles.set(event.payload.filename, {
 							...event.payload,
@@ -401,6 +378,9 @@
 		setupListeners();
 
 		return () => {
+			[...sendingFiles.values()].forEach((file) =>
+				stopFileSending(file.filename)
+			);
 			unlisteners.forEach((fn) => fn());
 		};
 	});
@@ -509,6 +489,41 @@
 					</Select.Group>
 				</Select.Content>
 			</Select.Root>
+			{#if algoStr.startsWith('block:')}
+				<p class="mx-3">Choose padding:</p>
+				<Select.Root
+					type="single"
+					bind:value={padStr}
+				>
+					<Select.Trigger
+						class="border-bg-5 data-[placeholder]:text-fg-3 min-w-40"
+					>
+						{triggerContentPad}
+					</Select.Trigger>
+					<Select.Content class="bg-bg-2 text-fg-1 border-bg-4">
+						<Select.Group>
+							<Select.Item
+								value=""
+								label="None"
+								disabled={padStr === ''}
+								class="hover:text-fg-0 hover:bg-bg-3/50"
+							>
+								None
+							</Select.Item>
+							{#each padModes as padMode}
+								<Select.Item
+									value={padMode.value}
+									label={padMode.label}
+									disabled={modeStr === padMode.value}
+									class="hover:text-fg-0 hover:bg-bg-3/50"
+								>
+									{padMode.label}
+								</Select.Item>
+							{/each}
+						</Select.Group>
+					</Select.Content>
+				</Select.Root>
+			{/if}
 		</div>
 		<div class="flex w-full flex-wrap items-center gap-3 px-5 py-1">
 			<p>IP Address:</p>
@@ -682,8 +697,8 @@
 				onRefresh={() => loadFiles(false)}
 				constFilter={undefined}
 				processingFiles={receivingFilesArray}
-				pendingFiles={recvQueue}
-				onAcceptRejectFile={approveDenyFile}
+				pendingFiles={[]}
+				onAcceptRejectFile={() => {}}
 			/>
 		</div>
 	</div>

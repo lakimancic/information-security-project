@@ -19,18 +19,18 @@ use crate::files::commands::{change_dir, get_files, go_dir_back, set_current_dir
 use crate::files::commands::{start_file_watching, stop_file_watching};
 use crate::key_manager::commands::{find_key, find_keys_by_algo, generate_new_key, list_keys, remove_key,
                                    load_keys, save_keys};
-use crate::network::commands::{send_file, send_key, start_file_listening, stop_file_listening, approve_incoming, deny_incoming,
+use crate::network::commands::{send_file, send_key, start_file_listening, stop_file_listening,
                                start_key_listening, stop_key_listening, get_network_keys, remove_network_key, stop_sending, stop_receiving};
 use crate::files::file_explorer::FileExplorer;
 use crate::files::watch::WatcherState;
-use crate::jobs::{JobRegistry, ListenerControl, ReceiverRegistry};
+use crate::jobs::{JobRegistry, ListenerControl};
 use crate::key_manager::key_manager::KeyManager;
 use crate::network::NetworkKeys;
 
 pub struct AppState {
     jobs: JobRegistry,
     send_jobs: JobRegistry,
-    recv_jobs: ReceiverRegistry,
+    recv_jobs: JobRegistry,
     file_listener: Mutex<ListenerControl>,
     key_listener: Mutex<ListenerControl>,
     source_explorer: Mutex<FileExplorer>,
@@ -75,7 +75,7 @@ pub fn run() {
             key_manager: Mutex::new(KeyManager::new()),
             jobs: JobRegistry::default(),
             send_jobs: JobRegistry::default(),
-            recv_jobs: ReceiverRegistry::default(),
+            recv_jobs: JobRegistry::default(),
             file_listener: Mutex::new(ListenerControl { stop: Arc::new(AtomicBool::new(false) )}),
             key_listener: Mutex::new(ListenerControl { stop: Arc::new(AtomicBool::new(false) )}),
             watcher: Arc::new(Mutex::new(None)),
@@ -90,7 +90,7 @@ pub fn run() {
             encrypt_file, stop_processing, decrypt_file,
             stop_file_watching, start_file_watching,
             send_file, send_key, stop_sending,
-            start_file_listening, stop_file_listening, approve_incoming, deny_incoming, stop_receiving,
+            start_file_listening, stop_file_listening, stop_receiving,
             start_key_listening, stop_key_listening, get_network_keys, remove_network_key
         ])
         .run(tauri::generate_context!())

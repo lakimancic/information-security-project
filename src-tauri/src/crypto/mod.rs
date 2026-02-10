@@ -20,7 +20,7 @@ pub enum CipherInstance {
     Block {
         cipher: Box<dyn BlockCipher>,
         mode: Box<dyn BlockMode>,
-        padding: Box< dyn Padding>,
+        padding: Option<Box<dyn Padding>>
     }
 }
 
