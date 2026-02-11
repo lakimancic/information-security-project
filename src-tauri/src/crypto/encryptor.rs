@@ -103,18 +103,29 @@ impl Encryptor {
     {
         match self.cipher {
             CipherInstance::Stream(ref mut stream) => {
-                let mut buf = vec![0u8; BUFFER_SIZE];
+                let mut in_buf = vec![0u8; BUFFER_SIZE];
+                let mut out_buf = Vec::<u8>::with_capacity(BUFFER_SIZE);
+
                 stream.reset()?;
 
                 loop {
-                    let n = input.read(&mut buf)?;
+                    let n = input.read(&mut in_buf)?;
                     if n == 0 {
                         break;
                     }
-                    for b in &mut buf[..n] {
-                        *b = stream.decrypt_byte(*b)?;
+
+                    for &b in &in_buf[..n] {
+                        out_buf.push(stream.decrypt_byte(b)?);
                     }
-                    output.write_all(&buf[..n])?;
+
+                    if out_buf.len() >= BUFFER_SIZE {
+                        output.write_all(&out_buf)?;
+                        out_buf.clear();
+                    }
+                }
+
+                if !out_buf.is_empty() {
+                    output.write_all(&out_buf)?;
                 }
             }
 
@@ -124,28 +135,36 @@ impl Encryptor {
                 ref padding,
             } => {
                 let bs = cipher.block_size();
-                let mut buffer = vec![0u8; BUFFER_SIZE];
+
+                let mut in_buf = vec![0u8; BUFFER_SIZE];
                 let mut leftover = Vec::<u8>::new();
+
                 let mut last_block: Option<Vec<u8>> = None;
+                let mut out_buf = Vec::<u8>::with_capacity(BUFFER_SIZE);
 
                 mode.reset()?;
 
                 loop {
-                    let n = input.read(&mut buffer)?;
+                    let n = input.read(&mut in_buf)?;
                     if n == 0 {
                         break;
                     }
 
-                    leftover.extend_from_slice(&buffer[..n]);
+                    leftover.extend_from_slice(&in_buf[..n]);
 
-                    let full_len = leftover.len() / bs * bs;
+                    let full_len = (leftover.len() / bs) * bs;
                     let mut blocks = leftover.drain(..full_len).collect::<Vec<_>>();
 
                     for block in blocks.chunks_exact_mut(bs) {
                         mode.decrypt_next(cipher.deref(), block)?;
 
                         if let Some(prev) = last_block.replace(block.to_vec()) {
-                            output.write_all(&prev)?;
+                            out_buf.extend_from_slice(&prev);
+
+                            if out_buf.len() >= BUFFER_SIZE {
+                                output.write_all(&out_buf)?;
+                                out_buf.clear();
+                            }
                         }
                     }
                 }
@@ -153,23 +172,27 @@ impl Encryptor {
                 match (last_block, padding) {
                     (Some(mut block), Some(pad)) => {
                         pad.unpad(&mut block, bs)?;
-                        output.write_all(&block)?;
+                        out_buf.extend_from_slice(&block);
                     }
 
                     (Some(block), None) => {
-                        output.write_all(&block)?;
+                        out_buf.extend_from_slice(&block);
                     }
 
                     (None, None) => {
                         if !leftover.is_empty() {
                             mode.decrypt_next(cipher.deref(), &mut leftover)?;
-                            output.write_all(&leftover)?;
+                            out_buf.extend_from_slice(&leftover);
                         }
                     }
 
                     (None, Some(_)) => {
                         return Err(CryptoError::InvalidPadding);
                     }
+                }
+
+                if !out_buf.is_empty() {
+                    output.write_all(&out_buf)?;
                 }
             }
         }

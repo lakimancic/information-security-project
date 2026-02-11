@@ -54,11 +54,6 @@ fn try_start_job(
     app: &tauri::AppHandle,
     mode: &WatchMode,
 ) {
-    if should_skip(&path) {
-        pending.remove(&path);
-        return;
-    }
-
     let filename = match path.file_name().and_then(|s| s.to_str()) {
         Some(f) => f.to_string(),
         None => {
@@ -74,7 +69,12 @@ fn try_start_job(
 
     match mode {
         WatchMode::Encrypt(req) => {
-            let _ = try_start_encrypt(
+            if should_skip(&path) {
+                pending.remove(&path);
+                return;
+            }
+            
+            let result = try_start_encrypt(
                 app.clone(),
                 jobs.clone(),
                 watch_path.to_path_buf(),
@@ -82,10 +82,13 @@ fn try_start_job(
                 filename,
                 req.clone(),
             );
+            if let Err(err) = result {
+                tracing::error!("failed to encrypt file: {}", err);
+            }
         }
         WatchMode::Decrypt(key) => {
             if path.extension().and_then(|s| s.to_str()) == Some("enc") {
-                let _ = try_start_decrypt(
+                let result = try_start_decrypt(
                     app.clone(),
                     jobs.clone(),
                     watch_path.to_path_buf(),
@@ -93,6 +96,9 @@ fn try_start_job(
                     filename,
                     key.clone(),
                 );
+                if let Err(err) = result {
+                    tracing::error!("Failed to decrypt file: {}", err);
+                }
             }
         }
     }

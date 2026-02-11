@@ -206,9 +206,6 @@
 				notify.warning('Block mode is not selected', 3000);
 				return false;
 			}
-		} else {
-			notify.warning('File System Watching supports only encryption', 3000);
-			return false;
 		}
 
 		if (!destLocked) {
