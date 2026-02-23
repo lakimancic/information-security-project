@@ -671,7 +671,7 @@
 							<p class="flex-1">
 								{netKey[1][0]}{netKey[1][1] > 0 ? `+ ${netKey[1][1]}` : ''}B
 							</p>
-							<XCircleIcon class="text-error absolute right-4 cursor-pointer" />
+							<!-- <XCircleIcon class="text-error absolute right-4 cursor-pointer" /> -->
 						</div>
 					{/each}
 				</div>
