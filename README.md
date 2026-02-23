@@ -44,6 +44,20 @@ The frontend runs in **Svelte**, while cryptographic and system operations are i
 - ✅ **Encrypted TCP send/receive** flow
 - ✅ **Job progress and cancellation** support
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="./screenshots/scr01.png" alt="KriptOx Screenshot 1" width="48%" />
+  <img src="./screenshots/scr02.png" alt="KriptOx Screenshot 2" width="48%" />
+</p>
+<p align="center">
+  <img src="./screenshots/scr03.png" alt="KriptOx Screenshot 3" width="48%" />
+  <img src="./screenshots/scr04.png" alt="KriptOx Screenshot 4" width="48%" />
+</p>
+<p align="center">
+  <img src="./screenshots/scr05.png" alt="KriptOx Screenshot 5" width="48%" />
+</p>
+
 ## ⚡ Quick Start
 
 ### Prerequisites
@@ -88,4 +102,10 @@ Do not treat it as production-grade cryptographic software without independent r
 
 ## 📄 License
 
-See **`LICENSE`** in the repository root.
+This project is licensed under the **MIT License**.
+
+- ✅ You can use, modify, and distribute it
+- ✅ Commercial use is allowed
+- ⚠️ It is provided **as-is**, without warranty
+
+Full license text: **[`LICENSE`](./LICENSE)**.
